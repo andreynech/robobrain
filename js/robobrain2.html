@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - loaders - OBJ loader</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				font-family: Monospace;
+				background-color: #000;
+				color: #fff;
+				margin: 0px;
+				overflow: hidden;
+			}
+			#info {
+				color: #fff;
+				position: absolute;
+				top: 10px;
+				width: 100%;
+				text-align: center;
+				z-index: 100;
+				display:block;
+			}
+			#info a, .button { color: #f00; font-weight: bold; text-decoration: underline; cursor: pointer }
+		</style>
+	</head>
+
+	<body>
+		<div id="info">
+		<a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> - OBJLoader test
+		</div>
+
+		<script src="../build/three.js"></script>
+		<script src="js/jquery-3.2.1.js"></script>
+		<script src="js/loaders/OBJLoader.js"></script>
+
+		<script>
+
+			var container;
+
+			var camera, scene, renderer;
+
+            var room = null;
+            var bot = null;
+            var xpoint;
+            var line;
+            var blue_line_mat = new THREE.LineBasicMaterial({ color: 0x0000ff });
+            var blue_mat = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+            var red_mat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            var triangle_list = [];
+
+			var windowHalfX = window.innerWidth / 2;
+			var windowHalfY = window.innerHeight / 2;
+            var mouseX = 0;
+            var mouseY = 3000;
+
+            var raycaster = new THREE.Raycaster();
+
+            var request_data = { 'measurements': [], 'triangles': [], 'particles': [] };
+
+			init();
+			animate();
+
+			function init() {
+/*
+                $.post("https://ttqr7ivk34.execute-api.eu-central-1.amazonaws.com/dev/montecarlo/", JSON.stringify({ name: "John", time: "2pm" }))
+                  .done(function( data ) {
+                    console.log( "Data Loaded: " + data );
+                  });
+*/
+/*
+                $.ajax({
+                    url: "https://ttqr7ivk34.execute-api.eu-central-1.amazonaws.com/dev/montecarlo/",
+                    type: 'POST',
+                    crossDomain: true,
+//                    headers: {
+//                        "X-Api-Key": 'blablabla'
+//                    },
+                    data: JSON.stringify({ name: "John", time: "2pm" }),
+                    dataType: 'json',
+                    contentType: "application/json",
+                    success: function (data) {
+                        console.log("Data loaded: " + data);
+                    }
+                });
+*/
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 15000 );
+				camera.position.x = 0;
+				camera.position.y = 3000;
+				camera.position.z = 2500;
+                var look_target = new THREE.Vector3(1500, 1500, 100);
+				camera.lookAt(look_target);
+
+				// scene
+
+				scene = new THREE.Scene();
+
+				var ambient = new THREE.AmbientLight(0x101030, 1);
+				scene.add( ambient );
+
+				var directionalLight = new THREE.DirectionalLight( 0xffeedd );
+				directionalLight.position.set( 0, 1500, 500 );
+				scene.add( directionalLight );
+
+				// texture
+
+				var manager = new THREE.LoadingManager();
+				manager.onProgress = function ( item, loaded, total ) {
+
+					console.log( item, loaded, total );
+
+				};
+
+				var onProgress = function ( xhr ) {
+					if ( xhr.lengthComputable ) {
+						var percentComplete = xhr.loaded / xhr.total * 100;
+						console.log( Math.round(percentComplete, 2) + '% downloaded' );
+					}
+				};
+
+				var onError = function ( xhr ) {
+				};
+
+				// model
+                var g = new THREE.SphereGeometry(20, 32, 32);
+                var m = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+                xpoint = new THREE.Mesh(g, m);
+                xpoint.position.x = 0;
+                xpoint.position.y = 0;
+                xpoint.position.z = 0;
+                scene.add(xpoint);
+
+				var loader = new THREE.OBJLoader( manager );
+
+				loader.load( 'obj/room.obj', function ( object ) {
+
+                    object.traverse(function(child) {
+                        // Collect triangles
+                        if(child.geometry)
+                        {
+                            var verts = child.geometry.attributes.position.array;
+                            console.log('Adding position array: ' + verts.length);
+                            verts.forEach(function(element){request_data.triangles.push(element)});
+                        }
+                    } );
+
+                    console.log(request_data.triangles);
+
+                    room = object;
+					scene.add(object);
+
+				}, onProgress, onError );
+
+				loader.load( 'obj/bot.obj', function ( object ) {
+
+					object.traverse( function ( child ) {
+						//if(child instanceof THREE.Mesh) {
+                        //    child.material.map = texture;
+						//}
+					} );
+
+					object.position.x = 500;
+					object.position.z = -1500;
+                    bot = object;
+					scene.add(object);
+
+                    //create a blue LineBasicMaterial
+                    var material = 
+                        new THREE.LineBasicMaterial({ color: 0x0000ff });
+                    var geometry = new THREE.Geometry();
+                    var a = bot.position.clone();
+                    a.y += 300;
+                    var b = bot.position.clone();
+                    b.y += 300;
+                    b.z -= 7000;
+                    geometry.vertices.push(a);
+                    geometry.vertices.push(b);
+                    line = new THREE.Line(geometry, material);
+                    scene.add(line)
+
+				}, onProgress, onError );
+				//
+
+				renderer = new THREE.WebGLRenderer();
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				container.appendChild( renderer.domElement );
+
+				document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+
+				//
+
+				window.addEventListener( 'resize', onWindowResize, false );
+
+
+
+			}
+
+			function onWindowResize() {
+
+				windowHalfX = window.innerWidth / 2;
+				windowHalfY = window.innerHeight / 2;
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+
+			function onDocumentMouseMove( event ) {
+
+				mouseX = ( event.clientX - windowHalfX ) / 2;
+				mouseY = ( event.clientY - windowHalfY ) / 2;
+
+			}
+
+			//
+
+			function animate()
+            {
+				//requestAnimationFrame( animate );
+
+                if(bot != null && room != null && bot.position.x < 4500)
+                {
+                    bot.position.x += 500;
+                    line.position.x += 500;
+
+                    var d = new THREE.Vector3(0, 0, -1);
+                    var r0 = bot.position.clone();
+                    r0.y += 300; // Where sensor located
+
+                    raycaster.set(r0, d);
+                    var intersects = raycaster.intersectObject(room, true);
+                    if(intersects.length > 0)
+                    {
+                        xpoint.position.copy(d);
+                        xpoint.position.multiplyScalar(intersects[0].distance);
+                        xpoint.position.add(r0);
+                        //console.log(xpoint.position);
+
+                        var measurement = 
+                            { 'distance': intersects[0].distance, 
+                              'origin': [r0.x, r0.y, r0.z], 
+                              'direction': [d.x, d.y, d.z] };
+                        request_data.measurements.length = 0; // clear array
+                        request_data.measurements.push(measurement);
+
+                        $.post("https://ttqr7ivk34.execute-api.eu-central-1.amazonaws.com/dev/montecarlo/", 
+                               JSON.stringify(request_data))
+                          .done(function(data) {
+                            console.log("Server response:");
+                            console.log(data);
+                            //console.log(data.errorMessage);
+                            requestAnimationFrame(animate);
+                          });
+                    }
+                    else
+                    {
+                        xpoint.position.set(0,0,0);
+                    }
+                }
+                else
+                    requestAnimationFrame(animate);
+
+				render();
+			}
+
+
+			function render()
+            {
+				renderer.render( scene, camera );
+			}
+
+		</script>
+
+	</body>
+</html>
