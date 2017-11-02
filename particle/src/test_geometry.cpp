@@ -1,6 +1,7 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 #include "geometry3d.h"
+#define _USE_MATH_DEFINES
 #include <math.h>
 
 
