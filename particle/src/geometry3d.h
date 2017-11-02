@@ -29,7 +29,7 @@ struct mesh_t
 // Sets bbox tuple to (min_coord, max_coord)
 void bounding_box(const mesh_t &mesh, box_t &bbox);
 
-void rotateY(const btVector3 v, btScalar radians, btVector3 &res);
+void rotateY(const btVector3 &v, btScalar radians, btVector3 &res);
 
 bool intersection(const box_t &bbox, 
                   const btVector3 &origin, 
