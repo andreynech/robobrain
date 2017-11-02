@@ -33,7 +33,7 @@ void bounding_box(const mesh_t &mesh, box_t &bbox)
 }
 
 
-void rotateY(const btVector3 v, btScalar radians, btVector3 &res)
+void rotateY(const btVector3 &v, btScalar radians, btVector3 &res)
 {
     static const btVector3 axis(0, 1, 0);
     res = v.rotate(axis, radians);
