@@ -1,23 +1,45 @@
 #include "geometry3d.h"
+#include <LinearMath/btVector3.h>
+#include <vector>
+#include <chrono>
+#include <random>
+#define _USE_MATH_DEFINES
+#include <math.h>
+
+
+typedef btVector4 particle_t;
+typedef std::vector<particle_t> particle_vector_t;
+struct motion_noise_t { btScalar bearing, steering, distance; };
+struct motion_t { btScalar d_theta, s; };
 
 
 // extract position from a particle set
-def get_position(p):
-    x = 0.0
-    y = 0.0
-    z = 0.0
-    orientation = 0.0
-    (_,_,_,init_orientation) = p[0]
-    for (px,py,pz,theta) in p:
-        x += px
-        y += py
-        z += pz
-        # orientation is tricky because it is cyclic. By normalizing
-        # around the first particle we are somewhat more robust to
-        # the 0=2pi problem
-        orientation += (((theta - init_orientation + pi) % (2.0 * pi)) 
-                        + init_orientation - pi)
-    return (x / len(p), y / len(p), z / len(p), orientation / len(p))
+void get_position(const particle_vector_t &particles, btVector3 &pos)
+{
+    btScalar x = 0.0;
+    btScalar y = 0.0;
+    btScalar z = 0.0;
+    btScalar orientation = 0;
+    btScalar init_orientation = particles.front().w();
+
+    for(const auto &p: particles)
+    {
+        x += p.x();
+        y += p.y();
+        z += p.z();
+        // orientation is tricky because it is cyclic. By normalizing
+        // around the first particle we are somewhat more robust to
+        // the 0=2pi problem
+        orientation += (((p.w() - init_orientation + M_PI) % (2.0 * M_PI)) 
+                        + init_orientation - M_PI);
+    }
+
+    particle_vector_t::size_type lenp = particles.size();
+    pos.setX(x / lenp);
+    pos.setY(y / lenp);
+    pos.setZ(z / lenp);
+    pos.setW(orientation / lenp);
+}
 
 
 // Here we are using equations for two-wheels differential
@@ -31,21 +53,29 @@ def get_position(p):
 // Where Sr and Sl is the distance travelled by each wheel and b is the
 // distance between wheels (vehicle width)
 //
-def move(particle, motion, noise):
-    _, steering_noise, distance_noise = noise
-    x, y, z, theta0 = particle
-    d_theta, s = motion
-    d_theta = random.gauss(d_theta, steering_noise)
-    s = random.gauss(s, distance_noise)
-    
-    theta = theta0 + d_theta;
-    x += s * cos(theta)
-    z += s * sin(theta)
+void move(const particle_t &particle,
+          const motion_t &motion,
+          const motion_noise_t &noise
+          particle_t &new_p)
+{
+    static const unsigned seed1 = 
+        std::chrono::system_clock::now().time_since_epoch().count();
+    static std::default_random_engine generator;
+    static std::normal_distribution<btScalar> gauss(0.0f, 1.0f);
 
-    return (x, y, z, theta % (2.0*pi))
+    btScalar theta =
+        particle.w() + motion.d_theta + gauss(generator) * noise.steering; 
+    btScalar s = motion.s + gauss(generator) * noise.distance; 
+
+    new_p.setX(particle.x() + s * cos(theta));
+    new_p.setY(particle.y());
+    new_p.setZ(particle.z() + s * sin(theta));
+    new_p.setW(theta % (2.0*M_PI));
+}
 
 
-def measurement_prob(boxes, vertices, particle, measurements, noise, max_meas):
+def measurement_prob(boxes, vertices, particle, measurements, noise, max_meas)
+{
     # calculate the correct measurement
     predicted_measurements = []
 
@@ -98,37 +128,4 @@ def measurement_prob(boxes, vertices, particle, measurements, noise, max_meas):
         error *= (exp(- (error_mes ** 2) / (bearing_noise ** 2) / 2.0) / sqrt(2.0 * pi * (bearing_noise ** 2)))
         #print('error:', error)
     return error
-
-
-def lambda_handler(event, context):
-    xpoints = []
-    triangles = event['triangles']
-    motion = event['motion'] # delta_theta, s
-    noise = event['noise'] # bearing, steering, distance
-    #logger.info('Processing {0} triangles'.format(len(triangles)/9))
-    for measurement in event['measurements']:
-        distances = []
-        for i in range(0, len(triangles), 9):
-            verts = (
-                (triangles[i+0],triangles[i+1],triangles[i+2]),
-                (triangles[i+3],triangles[i+4],triangles[i+5]),
-                (triangles[i+6],triangles[i+7],triangles[i+8]),
-            )
-            x, (t,u,v) = g3d.intersect_triangle(
-                measurement['origin'],
-                measurement['direction'], 
-                verts, 
-                True)
-            if x and t > 0:
-                distances.append(t)
-        if len(distances) > 0:
-            # Calculate world coordinates of the intersection
-            #logger.info('Origin {0}'.format(measurement['origin']))
-            #logger.info('Direction {0}'.format(measurement['direction']))
-            #logger.info('Distances {0}'.format(distances))
-            xpoint = g3d.plus(measurement['origin'], 
-                mul_scalar(measurement['direction'], min(distances)))
-            xpoints.append(xpoint)
-
-    return json.dumps(xpoints)
-
+}
