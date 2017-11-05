@@ -2,7 +2,7 @@
 #include "geometry3d.h"
 #include "montecarlo.h"
 
-
+/*
 location = [1000, 0, 1000, 0] 
 
 
@@ -13,6 +13,11 @@ event = {
     'noise': [30.0, 1.0 * 0.5, 50.0], # bearing, steering, distance
     'measurements': []
 }
+*/
+
+#define N_PART 2000
+#define N_BOX 8
+#define N_SENSORS 8
 
 struct measurement_t
 {
@@ -51,9 +56,6 @@ std::ostream& operator << (std::ostream &os, const box_t &b)
     return os;
 }
 
-#define N_PART 2000
-#define N_BOX 8
-#define N_SENSORS 8
 
 int main(int argc, char *argv[])
 {
@@ -72,7 +74,7 @@ int main(int argc, char *argv[])
     std::cout << "Bounding box:" << bbox << std::end;
     print('World size:', world_x_size, world_y_size, world_z_size)
 
-
+/*
     particles = []
     if len(particles) == 0:
         for i in range(N_PART):
@@ -243,5 +245,8 @@ int main(int argc, char *argv[])
             particles[n] = mc.move(p, motion, noise)
 
         location[0] += 500
+*/
+
+    return 0;
 }
 

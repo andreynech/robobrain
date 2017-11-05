@@ -1,16 +1,9 @@
+#include "montecarlo.h"
 #include "geometry3d.h"
-#include <LinearMath/btVector3.h>
-#include <vector>
 #include <chrono>
 #include <random>
 #define _USE_MATH_DEFINES
 #include <math.h>
-
-
-typedef btVector4 particle_t;
-typedef std::vector<particle_t> particle_vector_t;
-struct motion_noise_t { btScalar bearing, steering, distance; };
-struct motion_t { btScalar d_theta, s; };
 
 
 // extract position from a particle set
@@ -73,7 +66,7 @@ void move(const particle_t &particle,
     new_p.setW(theta % (2.0*M_PI));
 }
 
-
+/*
 def measurement_prob(boxes, vertices, particle, measurements, noise, max_meas)
 {
     # calculate the correct measurement
@@ -129,3 +122,4 @@ def measurement_prob(boxes, vertices, particle, measurements, noise, max_meas)
         #print('error:', error)
     return error
 }
+*/
