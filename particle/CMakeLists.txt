@@ -35,6 +35,7 @@ download_project(PROJ                googletest
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
 
+set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 download_project(PROJ                assimp
                  GIT_REPOSITORY      https://github.com/assimp/assimp.git
                  GIT_TAG             v4.0.1
