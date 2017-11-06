@@ -16,19 +16,20 @@ void bounding_box(const mesh_t &mesh, box_t &bbox)
 
     for(const auto& vert: mesh.vertices)
     {
-        if(bbox.first.x() < vert.x())
-            bbox.first.setX(vert.x());
-        if(bbox.first.y() < vert.y())
-            bbox.first.setY(vert.y());
-        if(bbox.first.z() < vert.z())
-            bbox.first.setZ(vert.z());
-
-        if(bbox.second.x() > vert.x())
+        // max coordinates
+        if(bbox.second.x() < vert.x())
             bbox.second.setX(vert.x());
-        if(bbox.second.y() > vert.y())
+        if(bbox.second.y() < vert.y())
             bbox.second.setY(vert.y());
-        if(bbox.second.z() > vert.z())
+        if(bbox.second.z() < vert.z())
             bbox.second.setZ(vert.z());
+        // min coordinates
+        if(bbox.first.x() > vert.x())
+            bbox.first.setX(vert.x());
+        if(bbox.first.y() > vert.y())
+            bbox.first.setY(vert.y());
+        if(bbox.first.z() > vert.z())
+            bbox.first.setZ(vert.z());
     }
 }
 
@@ -185,7 +186,7 @@ bool intersect_triangle(const btVector3 &orig,
     btScalar t, u, v;
     // To ensure numerical stability the test which eliminates parallel rays
     // must compare the determinant to a small interval around zero.
-    btScalar epsilon = 1e-5;
+    btScalar epsilon = btScalar(1e-5);
     // Begin calculating determinant - also used to calculate U parameter
     btVector3 pvec = dir.cross(edge2);
     // If determinant is near zero, ray lies in plane of triangle
@@ -209,7 +210,7 @@ bool intersect_triangle(const btVector3 &orig,
             return false;
         // Calculate t, scale parameters, ray intersects triangle
         t = edge2.dot(qvec);
-        btScalar inv_det = 1.0 / det;
+        btScalar inv_det = btScalar(1.0) / det;
         t *= inv_det;
         u *= inv_det;
         v *= inv_det;
@@ -218,7 +219,7 @@ bool intersect_triangle(const btVector3 &orig,
     {
         if(det > -epsilon && det < epsilon)
             return false;
-        btScalar inv_det = 1.0 / det;
+        btScalar inv_det = btScalar(1.0) / det;
         // Calculate distance from vert0 to ray origin
         btVector3 tvec = orig - vert0;
         // Calculate U parameter and test bounds

@@ -23,6 +23,7 @@ download_project(PROJ                bullet
 )
 add_subdirectory(${bullet_SOURCE_DIR} ${bullet_BINARY_DIR})
 
+
 # Download and configure googletest
 download_project(PROJ                googletest
                  GIT_REPOSITORY      https://github.com/google/googletest.git
@@ -34,10 +35,20 @@ download_project(PROJ                googletest
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
 
+download_project(PROJ                assimp
+                 GIT_REPOSITORY      https://github.com/assimp/assimp.git
+                 GIT_TAG             v4.0.1
+                 ${UPDATE_DISCONNECTED_IF_AVAILABLE}
+)
+add_subdirectory(${assimp_SOURCE_DIR} ${assimp_BINARY_DIR})
+
 set(BULLET_LIBRARIES LinearMath)
+set(ASSIMP_LIBRARIES assimp)
 
 include_directories(${googletest_SOURCE_DIR}/googletest/include
                     ${googletest_SOURCE_DIR}/googlemock/include
+                    ${assimp_SOURCE_DIR}/include
+                    ${assimp_BINARY_DIR}/include
                     ${bullet_SOURCE_DIR}/src)
 
 link_directories(${googletest_BINARY_DIR}/googletest
@@ -46,10 +57,11 @@ link_directories(${googletest_BINARY_DIR}/googletest
 
 set(SOURCES
     src/geometry3d.cpp src/geometry3d.h
-    src/main.cpp)
+    src/montecarlo.cpp src/montecarlo.h
+    src/test_particle.cpp)
 
 add_executable(particlefilter ${SOURCES})
-target_link_libraries(particlefilter ${BULLET_LIBRARIES})
+target_link_libraries(particlefilter ${BULLET_LIBRARIES} ${ASSIMP_LIBRARIES})
 
 enable_testing()
 

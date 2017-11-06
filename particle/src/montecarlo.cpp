@@ -23,8 +23,8 @@ void get_position(const particle_vector_t &particles, btVector3 &pos)
         // orientation is tricky because it is cyclic. By normalizing
         // around the first particle we are somewhat more robust to
         // the 0=2pi problem
-        orientation += (((p.w() - init_orientation + M_PI) % (2.0 * M_PI)) 
-                        + init_orientation - M_PI);
+        orientation += btScalar((fmod((p.w() - init_orientation + M_PI), (2.0 * M_PI)) 
+                        + init_orientation - M_PI));
     }
 
     particle_vector_t::size_type lenp = particles.size();
@@ -48,12 +48,12 @@ void get_position(const particle_vector_t &particles, btVector3 &pos)
 //
 void move(const particle_t &particle,
           const motion_t &motion,
-          const motion_noise_t &noise
+          const motion_noise_t &noise,
           particle_t &new_p)
 {
     static const unsigned seed1 = 
-        std::chrono::system_clock::now().time_since_epoch().count();
-    static std::default_random_engine generator;
+		unsigned(std::chrono::system_clock::now().time_since_epoch().count());
+    static std::default_random_engine generator(seed1);
     static std::normal_distribution<btScalar> gauss(0.0f, 1.0f);
 
     btScalar theta =
@@ -63,7 +63,7 @@ void move(const particle_t &particle,
     new_p.setX(particle.x() + s * cos(theta));
     new_p.setY(particle.y());
     new_p.setZ(particle.z() + s * sin(theta));
-    new_p.setW(theta % (2.0*M_PI));
+    new_p.setW(btScalar(fmod(theta, (2.0*M_PI))));
 }
 
 /*

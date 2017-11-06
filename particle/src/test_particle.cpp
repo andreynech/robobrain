@@ -1,4 +1,10 @@
 #include <iostream>
+#include <cassert>
+
+#include <assimp/Importer.hpp>  // C++ importer interface
+#include <assimp/scene.h>       // Output data structure
+#include <assimp/postprocess.h> // Post processing flags
+
 #include "geometry3d.h"
 #include "montecarlo.h"
 
@@ -59,20 +65,67 @@ std::ostream& operator << (std::ostream &os, const box_t &b)
 
 int main(int argc, char *argv[])
 {
-    scene = load('obj/room.obj')
-    assert len(scene.meshes)
-    for mesh in scene.meshes:
-        assert len(mesh.vertices)
-        for v in mesh.vertices:
-            triangles.extend(v)
-    release(scene)
+	request_t request;
+
+    {
+    // Create an instance of the Importer class
+    Assimp::Importer importer;
+    // And have it read the given file with some example postprocessing
+    // Usually - if speed is not the most important aspect for you - you'll 
+    // propably to request more postprocessing than we do in this example.
+    const aiScene* scene = importer.ReadFile("room.obj", 
+                   aiProcess_CalcTangentSpace       | 
+                   aiProcess_Triangulate            |
+                   aiProcess_JoinIdenticalVertices  |
+                   
+		           aiProcess_PreTransformVertices   |
+                   //aiProcess_OptimizeGraph          |
+                   //aiProcess_OptimizeMeshes         |
+
+                   aiProcess_SortByPType);
+
+    // If the import failed, report it
+    if(!scene)
+    {
+        std::cout << importer.GetErrorString() << std::endl;
+        return 1;
+    }
+
+    //std::cout << scene->mNumMeshes << " " << scene->mRootNode->mNumMeshes << std::endl;
+
+    unsigned int idx_offset = 0;
+
+	for(unsigned int i = 0; i < scene->mNumMeshes; ++i)
+	{
+        const aiMesh &mesh = *(scene->mMeshes[i]);
+        //std::cout << mesh.mNumVertices << std::endl;
+        for(unsigned int v = 0; v < mesh.mNumVertices; ++v)
+        {
+            btVector3 vert(mesh.mVertices[v].x,
+                           mesh.mVertices[v].y,
+                           mesh.mVertices[v].z);
+            request.mesh.vertices.push_back(vert);
+        }
+        for(unsigned int f = 0; f < mesh.mNumFaces; ++f)
+        {
+            const aiFace &face = mesh.mFaces[f];
+            assert(face.mNumIndices == 3);
+            request.mesh.triangles.push_back({face.mIndices[0] + idx_offset,
+                                              face.mIndices[1] + idx_offset,
+                                              face.mIndices[2] + idx_offset});
+        }
+        idx_offset += mesh.mNumVertices;
+	}
+    }
 
     box_t bbox; 
-    bounding_box(triangles, bbox);
-    btVector3 world_size = bbox.second - bbox.first
+    bounding_box(request.mesh, bbox);
+	btVector3 world_size = bbox.second - bbox.first;
 
-    std::cout << "Bounding box:" << bbox << std::end;
-    print('World size:', world_x_size, world_y_size, world_z_size)
+    std::cout << "Bounding box: " << bbox << std::endl;
+	std::cout << "World size: " << world_size << std::endl;
+	std::cout << "Vertex count: " << request.mesh.vertices.size() << std::endl;
+	std::cout << "Triangle count: " << request.mesh.triangles.size() << std::endl;
 
 /*
     particles = []
