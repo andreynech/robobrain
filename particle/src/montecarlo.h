@@ -1,13 +1,26 @@
 #pragma once
 
 #include <LinearMath/btVector3.h>
-#include <vector>
+#include <array>
+#include "geometry3d.h"
+
+// Particle count
+#define N_PART  20
 
 typedef btVector4 particle_t;
-typedef std::vector<particle_t> particle_vector_t;
+typedef std::array<particle_t, N_PART> particle_vector_t;
 struct motion_t { btScalar d_theta, s; }; 
 struct motion_noise_t { btScalar bearing, steering, distance; }; 
+struct space_partition_t
+{
+    box_t box;
+    std::vector<triangles_t::size_type> bounding_triangles;
+};
+typedef std::vector<space_partition_t> partition_vector_t;
 
+
+// Generates random number with Gaussian distribution
+btScalar random_gauss(btScalar mean, btScalar deviation);
 
 // extract position from a particle set
 void get_position(const particle_vector_t &particles, btVector3 &pos);

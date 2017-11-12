@@ -17,11 +17,14 @@ typedef std::vector<triangleidx_t> triangles_t;
 // Box represented by two corners, where first is "nearest" corner and
 // second is "fartherst"
 typedef std::pair<btVector3, btVector3> box_t;
+typedef std::array<btVector3, 2> edges_t;
+typedef std::vector<edges_t> edge_vector_t;
 
 struct mesh_t
 {
     vertices_t vertices;
     triangles_t triangles;
+    edge_vector_t edges;
 };
 
 

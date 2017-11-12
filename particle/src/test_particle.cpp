@@ -1,5 +1,11 @@
 #include <iostream>
 #include <cassert>
+#include <chrono>
+#include <random>
+#define _USE_MATH_DEFINES
+#include <math.h>
+#include <cmath>
+#include <limits>
 
 #include <assimp/Importer.hpp>  // C++ importer interface
 #include <assimp/scene.h>       // Output data structure
@@ -8,10 +14,10 @@
 #include "geometry3d.h"
 #include "montecarlo.h"
 
+
+static const btVector4 location(1000, 0, 1000, 0); 
+
 /*
-location = [1000, 0, 1000, 0] 
-
-
 event = {
     'triangles': [],
     'particles': [],
@@ -21,7 +27,6 @@ event = {
 }
 */
 
-#define N_PART 2000
 #define N_BOX 8
 #define N_SENSORS 8
 
@@ -46,13 +51,13 @@ struct request_t
 
 std::ostream& operator << (std::ostream &os, const btVector3 &v)
 {
-    os << "(" << v.x() << "," << v.y() << "," << v.z() << ")";
+    os << "(" << v.x() << ", " << v.y() << ", " << v.z() << ")";
     return os;
 }
 
 std::ostream& operator << (std::ostream &os, const btVector4 &v)
 {
-    os << "(" << v.x() << "," << v.y() << "," << v.z() << "," << v.w() << ")";
+    os << "(" << v.x() << ", " << v.y() << ", " << v.z() << ", " << v.w() << ")";
     return os;
 }
 
@@ -110,9 +115,15 @@ int main(int argc, char *argv[])
         {
             const aiFace &face = mesh.mFaces[f];
             assert(face.mNumIndices == 3);
-            request.mesh.triangles.push_back({face.mIndices[0] + idx_offset,
-                                              face.mIndices[1] + idx_offset,
-                                              face.mIndices[2] + idx_offset});
+            triangleidx_t new_triangle = {face.mIndices[0] + idx_offset,
+                                          face.mIndices[1] + idx_offset,
+                                          face.mIndices[2] + idx_offset};
+            request.mesh.triangles.push_back(new_triangle);
+
+            const btVector3 &v0 = request.mesh.vertices[new_triangle[0]];
+            const btVector3 &v1 = request.mesh.vertices[new_triangle[1]];
+            const btVector3 &v2 = request.mesh.vertices[new_triangle[2]];
+            request.mesh.edges.push_back({v1-v0, v2-v0});
         }
         idx_offset += mesh.mNumVertices;
 	}
@@ -127,127 +138,154 @@ int main(int argc, char *argv[])
 	std::cout << "Vertex count: " << request.mesh.vertices.size() << std::endl;
 	std::cout << "Triangle count: " << request.mesh.triangles.size() << std::endl;
 
-/*
-    particles = []
-    if len(particles) == 0:
-        for i in range(N_PART):
-            #particle = (random.random() * world_x_size + bbox[0][0],
-            #            random.random() * 3 + bbox[0][1],
-            #            random.random() * world_z_size + bbox[0][2],
-            #            random.random() * 2.0 * pi)
-            particle = (random.gauss(location[0], 500),
-                        random.gauss(location[1], 500),
-                        random.gauss(location[2], 500),
-                        random.gauss(location[3], pi / 4))
+    static const unsigned seed1 = 
+		unsigned(std::chrono::system_clock::now().time_since_epoch().count());
+    std::default_random_engine generator(seed1);
+    std::uniform_real_distribution<btScalar> random_uniform(0.0, 1.0);
 
-            particles.append(particle)
+    particle_vector_t particles;
+    for(auto &particle: particles)
+    {
+        particle.setX(random_uniform(generator) * world_size.x() + bbox.first.x());
+        particle.setY(random_uniform(generator) * 3 + bbox.first.y());
+        particle.setZ(random_uniform(generator) * world_size.z() + bbox.first.z());
+        particle.setW(random_uniform(generator) * 2 * M_PI);
+        /*
+        particle.setX(random_gauss(location.x(), 500));
+        particle.setY(random_gauss(location.y(), 500));
+        particle.setZ(random_gauss(location.z(), 500));
+        particle.setW(random_gauss(location.w(), M_PI_4));
+        */
+        //std::cout << particle << std::endl;
+    }
 
-    vertices = []
-    for i in range(0, len(triangles), 9):
-        v0 = triangles[i+0:i+3]
-        v1 = triangles[i+3:i+6]
-        v2 = triangles[i+6:i+9]
-        v = (v0, v1, v2,
-            g3d.minus(v1, v0), # Find vectors for two edges sharing vert0
-            g3d.minus(v2, v0)
-        )
-        vertices.append(v)
+    btScalar max_meas = world_size.x() * world_size.x()
+                        + world_size.z() * world_size.z();
+    std::array<btScalar, N_PART> weights;
 
-    max_meas = world_x_size **2 + world_z_size ** 2
-    weights = [0] * N_PART
+    // Split the world evenly with boxes
+    btScalar box_x_size = world_size.x() / N_BOX;
+    btScalar box_y_size = world_size.y();
+    btScalar box_z_size = world_size.z() / N_BOX;
+    btScalar box_x_half_size = box_x_size / 2;
+    btScalar box_y_half_size = box_y_size / 2;
+    btScalar box_z_half_size = box_z_size / 2;
+    partition_vector_t partitions;
+    for(size_t ix = 0; ix < N_BOX; ++ix)
+    {
+        for(size_t iz = 0; iz < N_BOX; ++iz)
+        {
+            space_partition_t part =
+            {
+                std::make_pair(
+                    btVector3( // box center
+                        box_x_size * ix + box_x_half_size,
+                        box_y_half_size,
+                        box_z_size * iz + box_z_half_size
+                    ),
+                    btVector3( // box half sizes
+                        box_x_half_size,
+                        box_y_half_size,
+                        box_z_half_size
+                    )),
+                    {} // placeholder for bounding triangle indexes
+            };
+            partitions.push_back(part);
+        }
+    }
 
-    # Split the world evenly with boxes
-    box_x_size = world_x_size / N_BOX
-    box_y_size = world_y_size
-    box_z_size = world_z_size / N_BOX
-    box_x_half_size = box_x_size / 2
-    box_y_half_size = box_y_size / 2
-    box_z_half_size = box_z_size / 2
-    boxes = []
-    for ix in range(N_BOX):
-        for iz in range(N_BOX):
-            box = (
-                ( # box center
-                    box_x_size * ix + box_x_half_size,
-                    box_y_half_size,
-                    box_z_size * iz + box_z_half_size
-                ),
-                ( # box half sizes
-                    box_x_half_size,
-                    box_y_half_size,
-                    box_z_half_size
-                ),
-                [] # placeholder for bounding triangle indexes
-            )
-            boxes.append(box)
+    // Calculate list of bounding triangles for each box
+    size_t triangles_processed = 0;
+    for(auto &part: partitions)
+    {
+        size_t i = 0;
+        for(auto const &tri_indexes: request.mesh.triangles)
+        {
+            trianglevert_t verts = {
+                &request.mesh.vertices[tri_indexes[0]],
+                &request.mesh.vertices[tri_indexes[1]],
+                &request.mesh.vertices[tri_indexes[2]]
+            };
+            if(triboxoverlap(part.box.first, part.box.second, verts))
+            {
+                //print(' **** in', i)
+                part.bounding_triangles.push_back(i);
+            }
+            ++i;
+        }
+        triangles_processed += part.bounding_triangles.size();
+        std::cout << "Triangles in box:" 
+                  << part.bounding_triangles.size() << std::endl;
+    }
+    std::cout << "Total triangles in boxes:" << triangles_processed << std::endl;
 
-    # Calculate list of bounding triangles for each box
-    print('Total triangles:', len(vertices))
-    tt = 0
-    for box in boxes:
-        for i, verts in enumerate(vertices):
-            #print(i, verts)
-            if g3d.triboxoverlap(box[0], box[1], verts):
-                #print(' **** in', i)
-                box[2].append(i)
-        tt += len(box[2])
-        print('Triangles in box:', len(box[2]))
-    print('Total triangles in boxes:', tt)
+    const btVector3 init_dir(1.0, 0.0, 0.0);
+    request.measurements.resize(N_SENSORS);
+    btScalar min_dist;
+    btVector3 origin;
+    btVector3 xpoint;
 
-    init_dir = [1.0, 0.0,  0.0]
+    for(size_t step = 0; step < 8; ++step)
+    {
+        // Simulate measurements
+        for(size_t s = 0; s < N_SENSORS; ++s) // generate sensor directions
+        {
+            rotateY(init_dir, 2.0 * M_PI / N_SENSORS * s, request.measurements[s].direction);
+        }
 
-    for step in range(8):
+        for(auto &meas: request.measurements)
+        {
+            meas.origin = btVector3(0.0, 300.0, 0.0);
+            origin = location + meas.origin;
+            meas.inv_direction.setX(
+                1.0 / (std::abs(meas.direction.x()) > 0.00001 ? 
+                          meas.direction.x() : 
+                          std::copysign(0.00001, meas.direction.x())));
+            meas.inv_direction.setY(
+                1.0 / (std::abs(meas.direction.y()) > 0.00001 ? 
+                          meas.direction.y() : 
+                          std::copysign(0.00001, meas.direction.y())));
+            meas.inv_direction.setZ(
+                1.0 / (std::abs(meas.direction.z()) > 0.00001 ? 
+                          meas.direction.z() : 
+                          std::copysign(0.00001, meas.direction.z())));
+            //print('origin:', origin, 'dir:', direction)
 
-        # Simulate measurements
-        measurements = []
-        for s in range(0, N_SENSORS): # generate sensor directions
-            measurements.append({'direction': 
-                g3d.rotateY(init_dir, 2.0 * pi / N_SENSORS * s)})
-
-        for meas in measurements:
-            meas['origin'] = [0.0, 300.0, 0.0]
-            min_dist = None
-            origin = g3d.plus(location, meas['origin'])
-            direction = meas['direction']
-            inv_direction = [
-                1.0 / (x if abs(x) > 0.00001 else copysign(0.00001, x)) for x in direction
-            ]
-            meas['inv_direction'] = inv_direction
-            #print('origin:', origin, 'dir:', direction)
+            min_dist = - std::numeric_limits<btScalar>::infinity();
             triangles_processed = 0
-            for bn, box in enumerate(boxes):
-                # build "bounding box" style box
-                bb = [
-                    [
-                        box[0][0] - box[1][0],
-                        box[0][1] - box[1][1],
-                        box[0][2] - box[1][2],
-                    ],
-                    [
-                        box[0][0] + box[1][0],
-                        box[0][1] + box[1][1],
-                        box[0][2] + box[1][2],
-                    ]
-                ]
-                # Check if measurement ray intersects the box.
-                # Only if it is we will check relevant triangles.
-                if g3d.boxrayintersectBL(bb, origin, inv_direction):
-                    #print('X aabb:', bn, bb, 'cnt:', len(box[2]), 'in direction: ', direction, 'origin', origin)
-                    for vx in box[2]:
+            partition_vector_t::size_type bn = 0;
+            for(const auto &part: partitions)
+            {
+                // build "bounding box" style box
+                box_t bb = std::make_pair(
+                        part.box.first - part.box.second,
+                        part.box.first + part.box.second);
+                // Check if measurement ray intersects the box.
+                // Only if it is we will check relevant triangles.
+                if(boxrayintersect(bb, origin, meas.inv_direction, xpoint))
+                {
+                    //print('X aabb:', bn, bb, 'cnt:', len(box[2]), 'in direction: ', direction, 'origin', origin)
+                    for(const auto &vx: part.bounding_triangles)
+                    {
                         verts = vertices[vx]
                         triangles_processed += 1
-                        x, (t,u,v) = g3d.intersect_triangle(origin, 
-                                                            direction, 
+                        bool x, (t,u,v) = g3d.intersect_triangle(origin, 
+                                                            meas.direction, 
                                                             verts, 
-                                                            True)
+                                                            xpoint,
+                                                            true);
                         if x and t > 0:
-                            #print(particle, t)
+                            //print(particle, t)
                             if min_dist is None or t < min_dist:
                                 min_dist = t
+                    }
+                }
+            }
             print('Processed triangles:', triangles_processed)
             meas['distance'] = min_dist
             print('Location/distance:', location, min_dist)
-
+        }
+/*
         # Measurement update
         for n, p in enumerate(particles):
             weights[n] = mc.measurement_prob(boxes, 
@@ -299,6 +337,7 @@ int main(int argc, char *argv[])
 
         location[0] += 500
 */
+    }
 
     return 0;
 }

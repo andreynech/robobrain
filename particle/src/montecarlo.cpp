@@ -1,5 +1,4 @@
 #include "montecarlo.h"
-#include "geometry3d.h"
 #include <chrono>
 #include <random>
 #define _USE_MATH_DEFINES
@@ -35,6 +34,17 @@ void get_position(const particle_vector_t &particles, btVector3 &pos)
 }
 
 
+btScalar random_gauss(btScalar mean, btScalar deviation)
+{
+    static const unsigned seed1 = 
+		unsigned(std::chrono::system_clock::now().time_since_epoch().count());
+    static std::default_random_engine generator(seed1);
+    static std::normal_distribution<btScalar> gauss(0.0f, 1.0f);
+
+    return mean + gauss(generator) * deviation;
+}
+
+
 // Here we are using equations for two-wheels differential
 // steering system as presented here 
 // http://rossum.sourceforge.net/papers/DiffSteer/DiffSteer.html :
@@ -51,14 +61,9 @@ void move(const particle_t &particle,
           const motion_noise_t &noise,
           particle_t &new_p)
 {
-    static const unsigned seed1 = 
-		unsigned(std::chrono::system_clock::now().time_since_epoch().count());
-    static std::default_random_engine generator(seed1);
-    static std::normal_distribution<btScalar> gauss(0.0f, 1.0f);
-
-    btScalar theta =
-        particle.w() + motion.d_theta + gauss(generator) * noise.steering; 
-    btScalar s = motion.s + gauss(generator) * noise.distance; 
+    btScalar theta = 
+        particle.w() + random_gauss(motion.d_theta, noise.steering); 
+    btScalar s = random_gauss(motion.s, noise.distance); 
 
     new_p.setX(particle.x() + s * cos(theta));
     new_p.setY(particle.y());
