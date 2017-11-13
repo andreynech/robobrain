@@ -14,6 +14,7 @@
 #include "geometry3d.h"
 #include "montecarlo.h"
 
+static const btScalar M_2PI = btScalar(M_PI) * 2;
 
 static const btVector4 location(1000, 0, 1000, 0); 
 
@@ -149,7 +150,7 @@ int main(int argc, char *argv[])
         particle.setX(random_uniform(generator) * world_size.x() + bbox.first.x());
         particle.setY(random_uniform(generator) * 3 + bbox.first.y());
         particle.setZ(random_uniform(generator) * world_size.z() + bbox.first.z());
-        particle.setW(random_uniform(generator) * 2 * M_PI);
+        particle.setW(random_uniform(generator) * M_2PI);
         /*
         particle.setX(random_gauss(location.x(), 500));
         particle.setY(random_gauss(location.y(), 500));
@@ -161,7 +162,6 @@ int main(int argc, char *argv[])
 
     btScalar max_meas = world_size.x() * world_size.x()
                         + world_size.z() * world_size.z();
-    std::array<btScalar, N_PART> weights;
 
     // Split the world evenly with boxes
     btScalar box_x_size = world_size.x() / N_BOX;
@@ -219,6 +219,7 @@ int main(int argc, char *argv[])
     }
     std::cout << "Total triangles in boxes:" << triangles_processed << std::endl;
 
+    std::array<btScalar, N_PART> weights;
     const btVector3 init_dir(1.0, 0.0, 0.0);
     request.measurements.resize(N_SENSORS);
     btScalar min_dist;
@@ -230,7 +231,7 @@ int main(int argc, char *argv[])
         // Simulate measurements
         for(size_t s = 0; s < N_SENSORS; ++s) // generate sensor directions
         {
-            rotateY(init_dir, 2.0 * M_PI / N_SENSORS * s, request.measurements[s].direction);
+            rotateY(init_dir, M_2PI / N_SENSORS * s, request.measurements[s].direction);
         }
 
         for(auto &meas: request.measurements)
@@ -238,21 +239,21 @@ int main(int argc, char *argv[])
             meas.origin = btVector3(0.0, 300.0, 0.0);
             origin = location + meas.origin;
             meas.inv_direction.setX(
-                1.0 / (std::abs(meas.direction.x()) > 0.00001 ? 
+                btScalar(1.0) / (std::abs(meas.direction.x()) > 0.00001 ? 
                           meas.direction.x() : 
-                          std::copysign(0.00001, meas.direction.x())));
+                          std::copysign(btScalar(0.00001), meas.direction.x())));
             meas.inv_direction.setY(
-                1.0 / (std::abs(meas.direction.y()) > 0.00001 ? 
+                btScalar(1.0) / (std::abs(meas.direction.y()) > 0.00001 ? 
                           meas.direction.y() : 
-                          std::copysign(0.00001, meas.direction.y())));
+                          std::copysign(btScalar(0.00001), meas.direction.y())));
             meas.inv_direction.setZ(
-                1.0 / (std::abs(meas.direction.z()) > 0.00001 ? 
+                btScalar(1.0) / (std::abs(meas.direction.z()) > 0.00001 ? 
                           meas.direction.z() : 
-                          std::copysign(0.00001, meas.direction.z())));
+                          std::copysign(btScalar(0.00001), meas.direction.z())));
             //print('origin:', origin, 'dir:', direction)
 
-            min_dist = - std::numeric_limits<btScalar>::infinity();
-            triangles_processed = 0
+            min_dist = (-std::numeric_limits<btScalar>::infinity());
+            triangles_processed = 0;
             partition_vector_t::size_type bn = 0;
             for(const auto &part: partitions)
             {
@@ -267,23 +268,32 @@ int main(int argc, char *argv[])
                     //print('X aabb:', bn, bb, 'cnt:', len(box[2]), 'in direction: ', direction, 'origin', origin)
                     for(const auto &vx: part.bounding_triangles)
                     {
-                        verts = vertices[vx]
-                        triangles_processed += 1
-                        bool x, (t,u,v) = g3d.intersect_triangle(origin, 
-                                                            meas.direction, 
-                                                            verts, 
-                                                            xpoint,
-                                                            true);
-                        if x and t > 0:
+                        const triangleidx_t &tri_verts_idx = 
+                            request.mesh.triangles[vx];
+                        const btVector3 &vert0 = 
+                            request.mesh.vertices[tri_verts_idx[0]];
+                        const btVector3 &edge1 = request.mesh.edges[vx][0];
+                        const btVector3 &edge2 = request.mesh.edges[vx][1];
+                        triangles_processed += 1;
+                        bool x = intersect_triangle(origin, meas.direction, 
+                                                    vert0, edge1, edge2,
+                                                    xpoint, true);
+                        btScalar t = xpoint.x();
+                        if(x && t > 0)
+                        {
                             //print(particle, t)
-                            if min_dist is None or t < min_dist:
-                                min_dist = t
+                            if(min_dist == (-std::numeric_limits<btScalar>::infinity()) 
+                               || t < min_dist)
+                            {
+                                min_dist = t;
+                            }
+                        }
                     }
                 }
             }
-            print('Processed triangles:', triangles_processed)
-            meas['distance'] = min_dist
-            print('Location/distance:', location, min_dist)
+            meas.distance = min_dist;
+            std::cout << "Processed triangles: " << triangles_processed << std::endl;
+            std::cout << "Location/distance: " << location << min_dist << std::endl;
         }
 /*
         # Measurement update
