@@ -80,13 +80,17 @@ int main(int argc, char *argv[])
     // Usually - if speed is not the most important aspect for you - you'll 
     // propably to request more postprocessing than we do in this example.
     const aiScene* scene = importer.ReadFile("room.obj", 
-                   aiProcess_CalcTangentSpace       | 
+		           //aiProcess_FlipWindingOrder       |
+                   //aiProcess_CalcTangentSpace       | 
                    aiProcess_Triangulate            |
                    aiProcess_JoinIdenticalVertices  |
                    
-		           aiProcess_PreTransformVertices   |
-                   //aiProcess_OptimizeGraph          |
-                   //aiProcess_OptimizeMeshes         |
+		           //aiProcess_PreTransformVertices   |
+                   aiProcess_OptimizeGraph          |
+                   aiProcess_OptimizeMeshes         |
+
+                   aiProcess_FixInfacingNormals     |
+                   aiProcess_GenSmoothNormals       |
 
                    aiProcess_SortByPType);
 
@@ -226,7 +230,7 @@ int main(int argc, char *argv[])
     btVector3 origin;
     btVector3 xpoint;
 
-    for(size_t step = 0; step < 8; ++step)
+    for(size_t step = 0; step < 1; ++step)
     {
         // Simulate measurements
         for(size_t s = 0; s < N_SENSORS; ++s) // generate sensor directions
@@ -234,8 +238,12 @@ int main(int argc, char *argv[])
             rotateY(init_dir, M_2PI / N_SENSORS * s, request.measurements[s].direction);
         }
 
-        for(auto &meas: request.measurements)
+        size_t m = 0;
+        auto &meas = request.measurements[0];
+        //for(auto &meas: request.measurements)
         {
+            ++m;
+            std::cout << "*************** Step: " << step << "  Measurement: " << m << std::endl;
             meas.origin = btVector3(0.0, 300.0, 0.0);
             origin = location + meas.origin;
             meas.inv_direction.setX(
@@ -250,7 +258,10 @@ int main(int argc, char *argv[])
                 btScalar(1.0) / (std::abs(meas.direction.z()) > 0.00001 ? 
                           meas.direction.z() : 
                           std::copysign(btScalar(0.00001), meas.direction.z())));
-            //print('origin:', origin, 'dir:', direction)
+            std::cout << "Origin: " << origin 
+                      << "  dir: " <<  meas.direction 
+                      << "  inv_dir: " <<  meas.inv_direction 
+                      << std::endl;
 
             min_dist = (-std::numeric_limits<btScalar>::infinity());
             triangles_processed = 0;
@@ -258,13 +269,18 @@ int main(int argc, char *argv[])
             for(const auto &part: partitions)
             {
                 // build "bounding box" style box
+                // .first is the middle of the box
+                // .second is half size
                 box_t bb = std::make_pair(
                         part.box.first - part.box.second,
                         part.box.first + part.box.second);
                 // Check if measurement ray intersects the box.
-                // Only if it is we will check relevant triangles.
+                // Only if it does, we will check relevant triangles.
                 if(boxrayintersect(bb, origin, meas.inv_direction, xpoint))
                 {
+                    std::cout << "Checking bounding box: " << bb 
+                              << " (" << part.bounding_triangles.size() << " triangles)" 
+                              << " - intersection" << std::endl;
                     //print('X aabb:', bn, bb, 'cnt:', len(box[2]), 'in direction: ', direction, 'origin', origin)
                     for(const auto &vx: part.bounding_triangles)
                     {
@@ -272,12 +288,26 @@ int main(int argc, char *argv[])
                             request.mesh.triangles[vx];
                         const btVector3 &vert0 = 
                             request.mesh.vertices[tri_verts_idx[0]];
+
                         const btVector3 &edge1 = request.mesh.edges[vx][0];
                         const btVector3 &edge2 = request.mesh.edges[vx][1];
+
                         triangles_processed += 1;
                         bool x = intersect_triangle(origin, meas.direction, 
                                                     vert0, edge1, edge2,
-                                                    xpoint, true);
+                                                    xpoint, false);
+                        const btVector3 &vert1 = 
+                            request.mesh.vertices[tri_verts_idx[1]];
+                        const btVector3 &vert2 = 
+                            request.mesh.vertices[tri_verts_idx[2]];
+                        /*if(vert0.x() > location.x() 
+                             && vert0.x() == vert1.x() 
+                             && vert1.x() == vert2.x())*/
+                        {
+                            std::cout << vert0 << " " << vert1 << " " << vert2;
+                            std::cout << "  --> " << x << std::endl;
+                        }
+                        
                         btScalar t = xpoint.x();
                         if(x && t > 0)
                         {
@@ -293,7 +323,7 @@ int main(int argc, char *argv[])
             }
             meas.distance = min_dist;
             std::cout << "Processed triangles: " << triangles_processed << std::endl;
-            std::cout << "Location/distance: " << location << min_dist << std::endl;
+            std::cout << "Location/distance: " << location << " / " << min_dist << std::endl;
         }
 /*
         # Measurement update

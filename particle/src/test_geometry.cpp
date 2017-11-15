@@ -11,7 +11,7 @@ TEST(Vector, rotateY)
     btVector3 v(1, 0, 0);
     btVector3 res;
 
-    rotateY(v, M_PI_2, res);
+    rotateY(v, btScalar(M_PI_2), res);
 
     EXPECT_NEAR(res.x(), 0, 1e-7);
     EXPECT_EQ(res.y(), 0);
@@ -71,3 +71,72 @@ TEST(Boxrayxing, inside_toright)
     EXPECT_NEAR(xpoint.z(), 5, 1e-7);
 }
 
+TEST(Trirayxing, left_to_right)
+{
+	// Vertices should be in counter-clock-wise (CCW) sequence
+	btVector3 v0(100, 0, 200);
+	btVector3 v1(100, 100, 0);
+	btVector3 v2(100, 0, 0);
+
+	btVector3 edge1 = v1 - v0;
+    btVector3 edge2 = v2 - v0;
+
+	btVector3 origin(5, 5, 5);
+    btVector3 direction(1, 0, 0);
+    btVector3 xpoint;
+
+	bool res = intersect_triangle(origin, direction,
+                                  v0, edge1, edge2, 
+                                  xpoint, true);
+
+    EXPECT_TRUE(res);
+    EXPECT_NEAR(xpoint.x(), v0.x() - origin.x(), 1e-1);
+}
+
+TEST(Trirayxing, right_to_left)
+{
+	// Vertices should be in counter-clock-wise (CCW) sequence
+	btVector3 v0(5, 0, 0);
+	btVector3 v1(5, 100, 0);
+	btVector3 v2(5, 0, 200);
+	
+	btVector3 edge1 = v1 - v0;
+	btVector3 edge2 = v2 - v0;
+
+	btVector3 origin(100, 5, 5);
+	btVector3 direction(-1, 0, 0);
+	btVector3 xpoint;
+
+	bool res = intersect_triangle(origin, direction,
+		v0, edge1, edge2,
+		xpoint, true);
+
+	EXPECT_TRUE(res);
+	EXPECT_NEAR(xpoint.x(), origin.x() - v0.x(), 1e-1);
+}
+
+TEST(Trirayxing, left_to_right_down_right)
+{
+	// Vertices should be in counter-clock-wise (CCW) sequence
+	btVector3 v0(100, 0, 200);
+	btVector3 v1(100, 100, 0);
+	btVector3 v2(100, 0, 0);
+
+	btVector3 edge1 = v1 - v0;
+	btVector3 edge2 = v2 - v0;
+
+	btVector3 origin(5, 5, 5);
+	btVector3 direction0(1, 0, 0);
+	btVector3 axis(0, 0, 1);
+	btScalar angle = btScalar(M_PI) / 8;
+	btVector3 direction = direction0.rotate(axis, angle);
+
+	btVector3 xpoint;
+
+	bool res = intersect_triangle(origin, direction,
+		v0, edge1, edge2,
+		xpoint, true);
+
+	EXPECT_TRUE(res);
+	EXPECT_NEAR(xpoint.x(), (v0.x() - origin.x()) / cos(angle), 1e-1);
+}
