@@ -37,6 +37,37 @@ TEST(Boxrayxing, outside)
     EXPECT_NEAR(xpoint.z(), 5, 1e-7);
 }
 
+TEST(Boxrayxing, outside2)
+{
+	btVector3 a(2500, 0, 0);
+	btVector3 b(5000, 1010, 3500);
+	box_t aabb = std::make_pair(a, b);
+	btVector3 ro(1000, 300, 1000);
+	btVector3 rd(1, 0, 0);
+	btVector3 xpoint;
+
+	bool res = boxrayintersect(aabb, ro, rd, xpoint);
+
+	EXPECT_TRUE(res);
+	EXPECT_NEAR(xpoint.x(), a.x(), 1e-7);
+	EXPECT_NEAR(xpoint.y(), ro.y(), 1e-7);
+	EXPECT_NEAR(xpoint.z(), ro.z(), 1e-7);
+}
+
+TEST(Boxrayxing, outside3)
+{
+	btVector3 a(2500, 0, 3500);
+	btVector3 b(5000, 1010, 7000);
+	box_t aabb = std::make_pair(a, b);
+	btVector3 ro(1000, 300, 1000);
+	btVector3 rd(1, 0, 0);
+	btVector3 xpoint;
+
+	bool res = boxrayintersect(aabb, ro, rd, xpoint);
+
+	EXPECT_FALSE(res);
+}
+
 TEST(Boxrayxing, inside_toleft)
 {
     btVector3 a(0, 0, 0);

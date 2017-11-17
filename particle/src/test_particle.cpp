@@ -28,13 +28,12 @@ event = {
 }
 */
 
-#define N_BOX 8
+#define N_BOX 2
 #define N_SENSORS 8
 
 struct measurement_t
 {
     btVector3 direction;
-    btVector3 inv_direction;
     btVector3 origin;
     btScalar distance;
 };
@@ -212,7 +211,6 @@ int main(int argc, char *argv[])
             };
             if(triboxoverlap(part.box.first, part.box.second, verts))
             {
-                //print(' **** in', i)
                 part.bounding_triangles.push_back(i);
             }
             ++i;
@@ -240,27 +238,14 @@ int main(int argc, char *argv[])
 
         size_t m = 0;
         auto &meas = request.measurements[0];
-        //for(auto &meas: request.measurements)
+        for(auto &meas: request.measurements)
         {
             ++m;
             std::cout << "*************** Step: " << step << "  Measurement: " << m << std::endl;
             meas.origin = btVector3(0.0, 300.0, 0.0);
             origin = location + meas.origin;
-            meas.inv_direction.setX(
-                btScalar(1.0) / (std::abs(meas.direction.x()) > 0.00001 ? 
-                          meas.direction.x() : 
-                          std::copysign(btScalar(0.00001), meas.direction.x())));
-            meas.inv_direction.setY(
-                btScalar(1.0) / (std::abs(meas.direction.y()) > 0.00001 ? 
-                          meas.direction.y() : 
-                          std::copysign(btScalar(0.00001), meas.direction.y())));
-            meas.inv_direction.setZ(
-                btScalar(1.0) / (std::abs(meas.direction.z()) > 0.00001 ? 
-                          meas.direction.z() : 
-                          std::copysign(btScalar(0.00001), meas.direction.z())));
             std::cout << "Origin: " << origin 
-                      << "  dir: " <<  meas.direction 
-                      << "  inv_dir: " <<  meas.inv_direction 
+                      << "  direction: " <<  meas.direction 
                       << std::endl;
 
             min_dist = (-std::numeric_limits<btScalar>::infinity());
@@ -268,21 +253,25 @@ int main(int argc, char *argv[])
             partition_vector_t::size_type bn = 0;
             for(const auto &part: partitions)
             {
+				std::cout << "Triangles in partition: " << part.bounding_triangles.size() << std::endl;
                 // build "bounding box" style box
                 // .first is the middle of the box
                 // .second is half size
                 box_t bb = std::make_pair(
                         part.box.first - part.box.second,
                         part.box.first + part.box.second);
-                // Check if measurement ray intersects the box.
+
+				/*std::cout << "Checking bounding box: " << bb
+					<< " (" << part.bounding_triangles.size() << " triangles)" 
+					<< std::endl;*/
+
+					// Check if measurement ray intersects the box.
                 // Only if it does, we will check relevant triangles.
-                if(boxrayintersect(bb, origin, meas.inv_direction, xpoint))
+                if(boxrayintersect(bb, origin, meas.direction, xpoint))
                 {
-                    std::cout << "Checking bounding box: " << bb 
-                              << " (" << part.bounding_triangles.size() << " triangles)" 
-                              << " - intersection" << std::endl;
-                    //print('X aabb:', bn, bb, 'cnt:', len(box[2]), 'in direction: ', direction, 'origin', origin)
-                    for(const auto &vx: part.bounding_triangles)
+                    //std:: cout << "       - intersection" << std::endl;
+
+					for(const auto &vx: part.bounding_triangles)
                     {
                         const triangleidx_t &tri_verts_idx = 
                             request.mesh.triangles[vx];
@@ -300,18 +289,11 @@ int main(int argc, char *argv[])
                             request.mesh.vertices[tri_verts_idx[1]];
                         const btVector3 &vert2 = 
                             request.mesh.vertices[tri_verts_idx[2]];
-                        /*if(vert0.x() > location.x() 
-                             && vert0.x() == vert1.x() 
-                             && vert1.x() == vert2.x())*/
-                        {
-                            std::cout << vert0 << " " << vert1 << " " << vert2;
-                            std::cout << "  --> " << x << std::endl;
-                        }
                         
                         btScalar t = xpoint.x();
                         if(x && t > 0)
                         {
-                            //print(particle, t)
+							//std::cout << "Intersection with tirangle # " << vx << std::endl;
                             if(min_dist == (-std::numeric_limits<btScalar>::infinity()) 
                                || t < min_dist)
                             {
