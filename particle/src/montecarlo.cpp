@@ -71,6 +71,73 @@ void move(const particle_t &particle,
     new_p.setW(btScalar(fmod(theta, (2.0*M_PI))));
 }
 
+
+btScalar
+measurement_prob(const partition_vector_t &partitions,
+                 const mesh_t &mesh,
+                 const particle_t &particle,
+                 const measurements_t &measurements,
+                 const motion_noise_t &noise,
+                 btScalar max_meas)
+{
+    btVector3 origin;
+    btVector3 direction;
+
+    for(const measurement_t &meas: measurements)
+    {
+        origin = particle + meas.origin;
+        direction = rotateY(meas.direction, particle.w(), direction);
+        min_dist = (-std::numeric_limits<btScalar>::infinity());
+
+        for(const space_partition_t &part: partitions)
+        {
+            // build "bounding box" style box
+            // .first is the middle of the box
+            // .second is half size
+            box_t bb = std::make_pair(
+                    part.box.first - part.box.second,
+                    part.box.first + part.box.second);
+
+            // Check if measurement ray intersects the box.
+            // Only if it does, we will check relevant triangles.
+            if(boxrayintersect(bb, origin, direction, xpoint))
+            {
+                for(const auto &vx: part.bounding_triangles)
+                {
+                    const triangleidx_t &tri_verts_idx = 
+                        request.mesh.triangles[vx];
+                    const btVector3 &vert0 = 
+                        request.mesh.vertices[tri_verts_idx[0]];
+
+                    const btVector3 &edge1 = request.mesh.edges[vx][0];
+                    const btVector3 &edge2 = request.mesh.edges[vx][1];
+
+                    triangles_processed += 1;
+                    bool x = intersect_triangle(origin, meas.direction, 
+                                                vert0, edge1, edge2,
+                                                xpoint, false);
+                    const btVector3 &vert1 = 
+                        request.mesh.vertices[tri_verts_idx[1]];
+                    const btVector3 &vert2 = 
+                        request.mesh.vertices[tri_verts_idx[2]];
+                    
+                    btScalar t = xpoint.x();
+                    if(x && t > 0)
+                    {
+                        std::cout << "Intersection with tirangle # " << vx << std::endl;
+                        if(min_dist == (-std::numeric_limits<btScalar>::infinity()) 
+                           || t < min_dist)
+                        {
+                            min_dist = t;
+                        }
+                    }
+                }
+            }
+        }
+        meas.distance = min_dist;
+    }
+}
+
 /*
 def measurement_prob(boxes, vertices, particle, measurements, noise, max_meas)
 {

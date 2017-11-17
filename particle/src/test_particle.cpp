@@ -199,7 +199,7 @@ int main(int argc, char *argv[])
 
     // Calculate list of bounding triangles for each box
     size_t triangles_processed = 0;
-    for(auto &part: partitions)
+    for(space_partition_t &part: partitions)
     {
         size_t i = 0;
         for(auto const &tri_indexes: request.mesh.triangles)
@@ -237,8 +237,7 @@ int main(int argc, char *argv[])
         }
 
         size_t m = 0;
-        auto &meas = request.measurements[0];
-        for(auto &meas: request.measurements)
+        for(measurement_t &meas: request.measurements)
         {
             ++m;
             std::cout << "*************** Step: " << step << "  Measurement: " << m << std::endl;
@@ -250,7 +249,6 @@ int main(int argc, char *argv[])
 
             min_dist = (-std::numeric_limits<btScalar>::infinity());
             triangles_processed = 0;
-            partition_vector_t::size_type bn = 0;
             for(const auto &part: partitions)
             {
 				std::cout << "Triangles in partition: " << part.bounding_triangles.size() << std::endl;
@@ -265,7 +263,7 @@ int main(int argc, char *argv[])
 					<< " (" << part.bounding_triangles.size() << " triangles)" 
 					<< std::endl;*/
 
-					// Check if measurement ray intersects the box.
+                // Check if measurement ray intersects the box.
                 // Only if it does, we will check relevant triangles.
                 if(boxrayintersect(bb, origin, meas.direction, xpoint))
                 {
@@ -293,7 +291,7 @@ int main(int argc, char *argv[])
                         btScalar t = xpoint.x();
                         if(x && t > 0)
                         {
-							//std::cout << "Intersection with tirangle # " << vx << std::endl;
+							std::cout << "Intersection with tirangle # " << vx << std::endl;
                             if(min_dist == (-std::numeric_limits<btScalar>::infinity()) 
                                || t < min_dist)
                             {
