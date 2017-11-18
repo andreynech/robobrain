@@ -2,6 +2,7 @@
 #include <cassert>
 #include <chrono>
 #include <random>
+#include <algorithm>
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <cmath>
@@ -16,7 +17,7 @@
 
 static const btScalar M_2PI = btScalar(M_PI) * 2;
 
-static const btVector4 location(1000, 0, 1000, 0); 
+static btVector4 location(1000, 0, 1000, 0); 
 
 /*
 event = {
@@ -28,17 +29,9 @@ event = {
 }
 */
 
-#define N_BOX 2
+#define N_BOX 8
 #define N_SENSORS 8
 
-struct measurement_t
-{
-    btVector3 direction;
-    btVector3 origin;
-    btScalar distance;
-};
-
-typedef std::vector<measurement_t> measurements_t;
 
 struct request_t
 {
@@ -147,24 +140,23 @@ int main(int argc, char *argv[])
     std::default_random_engine generator(seed1);
     std::uniform_real_distribution<btScalar> random_uniform(0.0, 1.0);
 
-    particle_vector_t particles;
-    for(auto &particle: particles)
+    if(request.particles.empty())
     {
-        particle.setX(random_uniform(generator) * world_size.x() + bbox.first.x());
-        particle.setY(random_uniform(generator) * 3 + bbox.first.y());
-        particle.setZ(random_uniform(generator) * world_size.z() + bbox.first.z());
-        particle.setW(random_uniform(generator) * M_2PI);
-        /*
-        particle.setX(random_gauss(location.x(), 500));
-        particle.setY(random_gauss(location.y(), 500));
-        particle.setZ(random_gauss(location.z(), 500));
-        particle.setW(random_gauss(location.w(), M_PI_4));
-        */
-        //std::cout << particle << std::endl;
+        for(auto &particle: request.particles)
+        {
+            particle.setX(random_uniform(generator) * world_size.x() + bbox.first.x());
+            particle.setY(random_uniform(generator) * 3 + bbox.first.y());
+            particle.setZ(random_uniform(generator) * world_size.z() + bbox.first.z());
+            particle.setW(random_uniform(generator) * M_2PI);
+            /*
+            particle.setX(random_gauss(location.x(), 500));
+            particle.setY(random_gauss(location.y(), 500));
+            particle.setZ(random_gauss(location.z(), 500));
+            particle.setW(random_gauss(location.w(), M_PI_4));
+            */
+            //std::cout << particle << std::endl;
+        }
     }
-
-    btScalar max_meas = world_size.x() * world_size.x()
-                        + world_size.z() * world_size.z();
 
     // Split the world evenly with boxes
     btScalar box_x_size = world_size.x() / N_BOX;
@@ -228,7 +220,7 @@ int main(int argc, char *argv[])
     btVector3 origin;
     btVector3 xpoint;
 
-    for(size_t step = 0; step < 1; ++step)
+    for(size_t step = 0; step < 7; ++step)
     {
         // Simulate measurements
         for(size_t s = 0; s < N_SENSORS; ++s) // generate sensor directions
@@ -251,7 +243,7 @@ int main(int argc, char *argv[])
             triangles_processed = 0;
             for(const auto &part: partitions)
             {
-				std::cout << "Triangles in partition: " << part.bounding_triangles.size() << std::endl;
+				//std::cout << "Triangles in partition: " << part.bounding_triangles.size() << std::endl;
                 // build "bounding box" style box
                 // .first is the middle of the box
                 // .second is half size
@@ -283,15 +275,10 @@ int main(int argc, char *argv[])
                         bool x = intersect_triangle(origin, meas.direction, 
                                                     vert0, edge1, edge2,
                                                     xpoint, false);
-                        const btVector3 &vert1 = 
-                            request.mesh.vertices[tri_verts_idx[1]];
-                        const btVector3 &vert2 = 
-                            request.mesh.vertices[tri_verts_idx[2]];
-                        
                         btScalar t = xpoint.x();
                         if(x && t > 0)
                         {
-							std::cout << "Intersection with tirangle # " << vx << std::endl;
+							//std::cout << "Intersection with tirangle # " << vx << std::endl;
                             if(min_dist == (-std::numeric_limits<btScalar>::infinity()) 
                                || t < min_dist)
                             {
@@ -305,58 +292,64 @@ int main(int argc, char *argv[])
             std::cout << "Processed triangles: " << triangles_processed << std::endl;
             std::cout << "Location/distance: " << location << " / " << min_dist << std::endl;
         }
-/*
-        # Measurement update
-        for n, p in enumerate(particles):
-            weights[n] = mc.measurement_prob(boxes, 
-                                            vertices, 
-                                            p, 
-                                            measurements, 
-                                            noise, 
-                                            max_meas)
-        #for ww in weights:
-        #    print('W:', ww)
-        # Normalization
-        sum_weights = sum(weights)
-        if not sum_weights == 0:
-            k = N_PART / sum(weights)
-            for n, w in enumerate(weights):
-                weights[n] = w * k
 
-        #for i, w in enumerate(weights):
-        #    if w > 0:
-        #        print('W:', w, particles[i])
+        // Measurement update
+        size_t n = 0;
+        for(const particle_t &particle: request.particles)
+        {
+            weights[n] = measurement_prob(partitions, 
+                                          request.mesh, 
+                                          particle, 
+                                          request.measurements, 
+                                          request.noise);
+            ++n;
+        }
 
-        print('Resampling')
-        # Resampling
-        p2 = []
-        index = int(random.random() * N_PART)
-        beta = 0.0
-        mw = max(weights)
-        for i in range(N_PART):
-            beta += random.random() * 2.0 * mw
-            while beta > weights[index]:
-                beta -= weights[index]
-                index = (index + 1) % N_PART
-            p2.append(particles[index])
+        // Normalization
+        btScalar sum_weights = btScalar(0.0);
+        for(const auto &w: weights)
+            sum_weights += w;
+        if(sum_weights != 0)
+        {
+            btScalar k = N_PART / sum_weights;
+            for(auto &w: weights)
+                w *= k;
+        }
 
-        est_pos = mc.get_position(particles)
-        print('Estimated position:', est_pos)
+        // Resampling
+        static particle_vector_t p2;
+        particle_vector_t::size_type index = 
+            particle_vector_t::size_type(random_uniform(generator)
+                                         * request.particles.size());
+        btScalar beta = 0.0;
+        const btScalar two_mw = 
+            btScalar(2.0) * (*std::max_element(weights.begin(), weights.end()));
+        for(particle_vector_t::size_type i = 0; i < request.particles.size(); ++i)
+        {
+            beta += random_uniform(generator) * two_mw;
+            while(beta > weights[index])
+            {
+                beta -= weights[index];
+                index = (index + 1) % request.particles.size();
+            }
+            p2[i] = request.particles[index];
+        }
 
-        visualization(location, est_pos, step, particles, p2, weights)
+        particle_t est_pos;
+        get_position(request.particles, est_pos);
+        std::cout << "** Estimated position: " << est_pos << std::endl;
 
-        particles = p2
+        //visualization(location, est_pos, step, particles, p2, weights)
 
-        print('======== {0} ========'.format(step))
-        #for p in particles:
-        #    print('P:', p)
+        request.particles = p2;
 
-        # Motion update (prediction)
-        for n, p in enumerate(particles):
-            particles[n] = mc.move(p, motion, noise)
+        std::cout << "======== " << step << " ========" << std::endl;
 
-        location[0] += 500
-*/
+        // Motion update (prediction)
+        for(auto &p: request.particles)
+            move(p, request.motion, request.noise, p);
+
+        location.setX(location.x() + 500);
     }
 
     return 0;

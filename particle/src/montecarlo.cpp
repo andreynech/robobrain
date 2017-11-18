@@ -1,6 +1,7 @@
 #include "montecarlo.h"
 #include <chrono>
 #include <random>
+#include <limits>
 #define _USE_MATH_DEFINES
 #include <math.h>
 
@@ -77,16 +78,19 @@ measurement_prob(const partition_vector_t &partitions,
                  const mesh_t &mesh,
                  const particle_t &particle,
                  const measurements_t &measurements,
-                 const motion_noise_t &noise,
-                 btScalar max_meas)
+                 const motion_noise_t &noise)
 {
     btVector3 origin;
     btVector3 direction;
+    btScalar min_dist;
+    btVector3 xpoint;
+    typedef std::vector<btScalar> scalar_vector_t;
+    scalar_vector_t predicted_measurements;
 
     for(const measurement_t &meas: measurements)
     {
         origin = particle + meas.origin;
-        direction = rotateY(meas.direction, particle.w(), direction);
+        rotateY(meas.direction, particle.w(), direction);
         min_dist = (-std::numeric_limits<btScalar>::infinity());
 
         for(const space_partition_t &part: partitions)
@@ -105,26 +109,19 @@ measurement_prob(const partition_vector_t &partitions,
                 for(const auto &vx: part.bounding_triangles)
                 {
                     const triangleidx_t &tri_verts_idx = 
-                        request.mesh.triangles[vx];
+                        mesh.triangles[vx];
                     const btVector3 &vert0 = 
-                        request.mesh.vertices[tri_verts_idx[0]];
+                        mesh.vertices[tri_verts_idx[0]];
 
-                    const btVector3 &edge1 = request.mesh.edges[vx][0];
-                    const btVector3 &edge2 = request.mesh.edges[vx][1];
+                    const btVector3 &edge1 = mesh.edges[vx][0];
+                    const btVector3 &edge2 = mesh.edges[vx][1];
 
-                    triangles_processed += 1;
                     bool x = intersect_triangle(origin, meas.direction, 
                                                 vert0, edge1, edge2,
                                                 xpoint, false);
-                    const btVector3 &vert1 = 
-                        request.mesh.vertices[tri_verts_idx[1]];
-                    const btVector3 &vert2 = 
-                        request.mesh.vertices[tri_verts_idx[2]];
-                    
                     btScalar t = xpoint.x();
                     if(x && t > 0)
                     {
-                        std::cout << "Intersection with tirangle # " << vx << std::endl;
                         if(min_dist == (-std::numeric_limits<btScalar>::infinity()) 
                            || t < min_dist)
                         {
@@ -134,8 +131,30 @@ measurement_prob(const partition_vector_t &partitions,
                 }
             }
         }
-        meas.distance = min_dist;
+        if(min_dist == (-std::numeric_limits<btScalar>::infinity()))
+            predicted_measurements.push_back(std::numeric_limits<btScalar>::infinity());
+        else
+            predicted_measurements.push_back(min_dist);
     }
+
+    // compute errors
+    btScalar error = 1.0;
+    btScalar error_mes;
+    const btScalar bearing_noise_pow2 = noise.bearing * noise.bearing;
+    const btScalar two_bearing_noise_pow2 = bearing_noise_pow2 * 2.0;
+
+    scalar_vector_t::const_iterator predicted_meas = predicted_measurements.begin();
+    for(const measurement_t &meas: measurements)
+    {
+        error_mes = meas.distance - (*predicted_meas);
+        ++predicted_meas;
+        // update Gaussian
+        error *= (exp(-(error_mes * error_mes) / two_bearing_noise_pow2) 
+                  / sqrt(2.0 * M_PI * (bearing_noise_pow2))
+                 );
+    }
+
+    return error;
 }
 
 /*

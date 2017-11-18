@@ -5,7 +5,7 @@
 #include "geometry3d.h"
 
 // Particle count
-#define N_PART  20
+#define N_PART  2000
 
 typedef btVector4 particle_t;
 typedef std::array<particle_t, N_PART> particle_vector_t;
@@ -17,7 +17,13 @@ struct space_partition_t
     std::vector<triangles_t::size_type> bounding_triangles;
 };
 typedef std::vector<space_partition_t> partition_vector_t;
-
+struct measurement_t
+{
+    btVector3 direction;
+    btVector3 origin;
+    btScalar distance;
+};
+typedef std::vector<measurement_t> measurements_t;
 
 // Generates random number with Gaussian distribution
 btScalar random_gauss(btScalar mean, btScalar deviation);
@@ -40,3 +46,12 @@ void move(const particle_t &particle,
           const motion_t &motion,
           const motion_noise_t &noise,
           particle_t &new_p);
+
+
+btScalar
+measurement_prob(const partition_vector_t &partitions,
+                 const mesh_t &mesh,
+                 const particle_t &particle,
+                 const measurements_t &measurements,
+                 const motion_noise_t &noise);
+
