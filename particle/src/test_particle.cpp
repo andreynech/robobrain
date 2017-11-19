@@ -30,8 +30,7 @@ event = {
 */
 
 #define N_BOX 8
-#define N_SENSORS 8
-
+#define N_SENSORS 4
 
 struct request_t
 {
@@ -44,19 +43,19 @@ struct request_t
 
 std::ostream& operator << (std::ostream &os, const btVector3 &v)
 {
-    os << "(" << v.x() << ", " << v.y() << ", " << v.z() << ")";
+    os << v.x() << " " << v.y() << " " << v.z();
     return os;
 }
 
 std::ostream& operator << (std::ostream &os, const btVector4 &v)
 {
-    os << "(" << v.x() << ", " << v.y() << ", " << v.z() << ", " << v.w() << ")";
+    os << v.x() << " " << v.y() << " " << v.z() << " " << v.w();
     return os;
 }
 
 std::ostream& operator << (std::ostream &os, const box_t &b)
 {
-    os << "[" << b.first << " " << b.second << "]";
+    os << "[" << b.first << ", " << b.second << "]";
     return os;
 }
 
@@ -64,6 +63,9 @@ std::ostream& operator << (std::ostream &os, const box_t &b)
 int main(int argc, char *argv[])
 {
 	request_t request;
+    request.motion = {0.0, 500.0}; // delta_theta, s
+    request.noise = {30.0, 1.0 * 0.5, 50.0}; // bearing, steering, distance
+
 
     {
     // Create an instance of the Importer class
@@ -140,22 +142,19 @@ int main(int argc, char *argv[])
     std::default_random_engine generator(seed1);
     std::uniform_real_distribution<btScalar> random_uniform(0.0, 1.0);
 
-    if(request.particles.empty())
+    for(auto &particle: request.particles)
     {
-        for(auto &particle: request.particles)
-        {
-            particle.setX(random_uniform(generator) * world_size.x() + bbox.first.x());
-            particle.setY(random_uniform(generator) * 3 + bbox.first.y());
-            particle.setZ(random_uniform(generator) * world_size.z() + bbox.first.z());
-            particle.setW(random_uniform(generator) * M_2PI);
-            /*
-            particle.setX(random_gauss(location.x(), 500));
-            particle.setY(random_gauss(location.y(), 500));
-            particle.setZ(random_gauss(location.z(), 500));
-            particle.setW(random_gauss(location.w(), M_PI_4));
-            */
-            //std::cout << particle << std::endl;
-        }
+        particle.setX(random_uniform(generator) * world_size.x() + bbox.first.x());
+        particle.setY(random_uniform(generator) * 3 + bbox.first.y());
+        particle.setZ(random_uniform(generator) * world_size.z() + bbox.first.z());
+        particle.setW(random_uniform(generator) * M_2PI);
+        /*
+        particle.setX(random_gauss(location.x(), 500));
+        particle.setY(random_gauss(location.y(), 500));
+        particle.setZ(random_gauss(location.z(), 500));
+        particle.setW(random_gauss(location.w(), M_PI_4));
+        */
+        //std::cout << particle.x() << "\t" << particle.y() << std::endl;
     }
 
     // Split the world evenly with boxes
@@ -208,8 +207,7 @@ int main(int argc, char *argv[])
             ++i;
         }
         triangles_processed += part.bounding_triangles.size();
-        std::cout << "Triangles in box:" 
-                  << part.bounding_triangles.size() << std::endl;
+        //std::cout << "Triangles in box:" << part.bounding_triangles.size() << std::endl;
     }
     std::cout << "Total triangles in boxes:" << triangles_processed << std::endl;
 
@@ -220,7 +218,7 @@ int main(int argc, char *argv[])
     btVector3 origin;
     btVector3 xpoint;
 
-    for(size_t step = 0; step < 7; ++step)
+    for(size_t step = 0; step < 3; ++step)
     {
         // Simulate measurements
         for(size_t s = 0; s < N_SENSORS; ++s) // generate sensor directions
@@ -289,7 +287,7 @@ int main(int argc, char *argv[])
                 }
             }
             meas.distance = min_dist;
-            std::cout << "Processed triangles: " << triangles_processed << std::endl;
+            //std::cout << "Processed triangles: " << triangles_processed << std::endl;
             std::cout << "Location/distance: " << location << " / " << min_dist << std::endl;
         }
 
@@ -302,6 +300,7 @@ int main(int argc, char *argv[])
                                           particle, 
                                           request.measurements, 
                                           request.noise);
+            //std::cout << weights[n] << std::endl;
             ++n;
         }
 
@@ -309,9 +308,10 @@ int main(int argc, char *argv[])
         btScalar sum_weights = btScalar(0.0);
         for(const auto &w: weights)
             sum_weights += w;
-        if(sum_weights != 0)
+        std::cout << "Sum(weights): " << sum_weights << std::endl;
+        if(sum_weights > 0)
         {
-            btScalar k = N_PART / sum_weights;
+            btScalar k = request.particles.size() / sum_weights;
             for(auto &w: weights)
                 w *= k;
         }
@@ -335,8 +335,12 @@ int main(int argc, char *argv[])
             p2[i] = request.particles[index];
         }
 
+        //for(const auto &p: p2) std::cout << p << std::endl;
+        //std::cout << std::endl;
+
         particle_t est_pos;
-        get_position(request.particles, est_pos);
+        //get_position(request.particles, est_pos);
+        get_position(p2, est_pos);
         std::cout << "** Estimated position: " << est_pos << std::endl;
 
         //visualization(location, est_pos, step, particles, p2, weights)

@@ -82,10 +82,11 @@ measurement_prob(const partition_vector_t &partitions,
 {
     btVector3 origin;
     btVector3 direction;
-    btScalar min_dist;
+    btScalar min_dist, t;
     btVector3 xpoint;
     typedef std::vector<btScalar> scalar_vector_t;
     scalar_vector_t predicted_measurements;
+    bool x;
 
     for(const measurement_t &meas: measurements)
     {
@@ -116,10 +117,10 @@ measurement_prob(const partition_vector_t &partitions,
                     const btVector3 &edge1 = mesh.edges[vx][0];
                     const btVector3 &edge2 = mesh.edges[vx][1];
 
-                    bool x = intersect_triangle(origin, meas.direction, 
-                                                vert0, edge1, edge2,
-                                                xpoint, false);
-                    btScalar t = xpoint.x();
+                    x = intersect_triangle(origin, meas.direction, 
+                                           vert0, edge1, edge2,
+                                           xpoint, false);
+                    t = xpoint.x();
                     if(x && t > 0)
                     {
                         if(min_dist == (-std::numeric_limits<btScalar>::infinity()) 
@@ -132,7 +133,8 @@ measurement_prob(const partition_vector_t &partitions,
             }
         }
         if(min_dist == (-std::numeric_limits<btScalar>::infinity()))
-            predicted_measurements.push_back(std::numeric_limits<btScalar>::infinity());
+            //predicted_measurements.push_back(std::numeric_limits<btScalar>::infinity());
+            predicted_measurements.push_back(7000);
         else
             predicted_measurements.push_back(min_dist);
     }
@@ -140,8 +142,7 @@ measurement_prob(const partition_vector_t &partitions,
     // compute errors
     btScalar error = 1.0;
     btScalar error_mes;
-    const btScalar bearing_noise_pow2 = noise.bearing * noise.bearing;
-    const btScalar two_bearing_noise_pow2 = bearing_noise_pow2 * 2.0;
+    const btScalar two_bearing_noise_pow2 = noise.bearing * noise.bearing * 2.0;
 
     scalar_vector_t::const_iterator predicted_meas = predicted_measurements.begin();
     for(const measurement_t &meas: measurements)
@@ -150,7 +151,7 @@ measurement_prob(const partition_vector_t &partitions,
         ++predicted_meas;
         // update Gaussian
         error *= (exp(-(error_mes * error_mes) / two_bearing_noise_pow2) 
-                  / sqrt(2.0 * M_PI * (bearing_noise_pow2))
+                  / sqrt(M_PI * two_bearing_noise_pow2)
                  );
     }
 

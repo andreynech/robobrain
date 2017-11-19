@@ -4,8 +4,9 @@
 #include <array>
 #include "geometry3d.h"
 
+
 // Particle count
-#define N_PART  2000
+#define N_PART  5000
 
 typedef btVector4 particle_t;
 typedef std::array<particle_t, N_PART> particle_vector_t;
