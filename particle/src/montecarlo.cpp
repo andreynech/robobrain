@@ -142,7 +142,7 @@ measurement_prob(const partition_vector_t &partitions,
     // compute errors
     btScalar error = 1.0;
     btScalar error_mes;
-    const btScalar two_bearing_noise_pow2 = noise.bearing * noise.bearing * 2.0;
+    const btScalar two_bearing_noise_pow2 = noise.bearing * noise.bearing * btScalar(2.0);
 
     scalar_vector_t::const_iterator predicted_meas = predicted_measurements.begin();
     for(const measurement_t &meas: measurements)
@@ -151,7 +151,7 @@ measurement_prob(const partition_vector_t &partitions,
         ++predicted_meas;
         // update Gaussian
         error *= (exp(-(error_mes * error_mes) / two_bearing_noise_pow2) 
-                  / sqrt(M_PI * two_bearing_noise_pow2)
+                  / btScalar(sqrt(M_PI * two_bearing_noise_pow2))
                  );
     }
 

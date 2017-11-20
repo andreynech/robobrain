@@ -218,7 +218,7 @@ int main(int argc, char *argv[])
     btVector3 origin;
     btVector3 xpoint;
 
-    for(size_t step = 0; step < 3; ++step)
+    for(size_t step = 0; step < 8; ++step)
     {
         // Simulate measurements
         for(size_t s = 0; s < N_SENSORS; ++s) // generate sensor directions
