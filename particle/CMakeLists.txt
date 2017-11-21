@@ -52,6 +52,14 @@ include_directories(${googletest_SOURCE_DIR}/googletest/include
                     ${assimp_BINARY_DIR}/include
                     ${bullet_SOURCE_DIR}/src)
 
+set(FLATBUFFERS_BUILD_GRPCTEST ON CACHE BOOL "" FORCE)
+download_project(PROJ                flatbuffers
+                 GIT_REPOSITORY      https://github.com/google/flatbuffers.git
+                 GIT_TAG             v1.7.1
+                 ${UPDATE_DISCONNECTED_IF_AVAILABLE}
+)
+add_subdirectory(${flatbuffers_SOURCE_DIR} ${flatbuffers_BINARY_DIR})
+
 link_directories(${googletest_BINARY_DIR}/googletest
                  ${googletest_BINARY_DIR}/googlemock
                  ${bullet_SOURCE_DIR}/src/LinearMath)
@@ -62,7 +70,12 @@ set(SOURCES
     src/test_particle.cpp)
 
 add_executable(particlefilter ${SOURCES})
-target_link_libraries(particlefilter ${BULLET_LIBRARIES} ${ASSIMP_LIBRARIES})
+target_link_libraries(particlefilter 
+                      ${BULLET_LIBRARIES}
+                      ${ASSIMP_LIBRARIES}
+                      mosquitto
+                      mosquittopp
+                     )
 
 enable_testing()
 

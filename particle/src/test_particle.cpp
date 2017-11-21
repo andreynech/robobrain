@@ -14,6 +14,7 @@
 
 #include "geometry3d.h"
 #include "montecarlo.h"
+#include "rpc_over_mqtt.h"
 
 static const btScalar M_2PI = btScalar(M_PI) * 2;
 
@@ -355,6 +356,12 @@ int main(int argc, char *argv[])
 
         location.setX(location.x() + 500);
     }
+
+    RPCClient cli("particle1", "server1", false);
+    std::string req("request1");
+    std::string response;
+    cli.call("particle_filter", req, response);
+    cli.loop_forever();
 
     return 0;
 }
