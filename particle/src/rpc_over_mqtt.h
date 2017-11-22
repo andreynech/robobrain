@@ -1,11 +1,13 @@
 #pragma once
 
+#include <future>
 #include <string>
 #include <sstream>
 #include <iostream>
 #include "mosquittopp.h"
 
 
+template <typename REQ_T, typename RESP_T>
 class RPCClient : public mosqpp::mosquittopp
 {
 public:
@@ -20,20 +22,19 @@ public:
         subscribe_topic(std::string("/") + svr_id + std::string("/") + cli_id + "/response"),
         start_event_loop(start_loop)
     {
-		int mid = 0;
-		int res = connect("localhost", 1883, 60);
-		if (res != 0)
-		{
-			std::cout << "Connect returned: " << res << " " << mosqpp::strerror(res) << std::endl;
-			std::cout << mosqpp::connack_string(res) << std::endl;
-		}
+        int mid = 0;
+        int res = connect("localhost", 1883, 60);
+        if (res != 0)
+        {
+            std::cerr << "Connect returned: " << res << " " << mosqpp::strerror(res) << std::endl;
+            std::cerr << mosqpp::connack_string(res) << std::endl;
+        }
         res = subscribe(&mid, subscribe_topic.c_str());
-		if (res)
-			std::cout << "Subscribe returned: " << res << " " << mosqpp::strerror(res) << std::endl;
+        if (res)
+            std::cerr << "Subscribe returned: " << res << " " << mosqpp::strerror(res) << std::endl;
 	
 		if (start_event_loop)
 		{
-			threaded_set(true);
 			loop_start();
 		}
 	}
@@ -49,7 +50,6 @@ public:
 
 public:
 
-    template <typename REQ_T, typename RESP_T>
     int call(const std::string &method_name, 
              const REQ_T &request,
              RESP_T &response)
@@ -61,23 +61,34 @@ public:
                           publish_topic.c_str(),
                           buffer.str().size(),
                           buffer.str().c_str());
-		if(res)
-			std::cout << "Publish returned: " << res << " " << mosqpp::strerror(res) << std::endl;
+        if(res)
+        {
+            std::cerr << "Publish returned: " << res << " " << mosqpp::strerror(res) << std::endl;
+        }
+        else
+        {
+            std::future<RESP_T> response_future = this->response_promise.get_future();
+            response_future.wait();
+            response = response_future.get();
+        }
+
         return res;
     }
 
 
     virtual void on_message(const struct mosquitto_message *message)
     {
-       std::cout << "Message id: " << message->mid << std::endl;
-       std::cout << "Topic: " << message->topic << std::endl;
-       std::cout << "Payload len: " << message->payloadlen << std::endl;
-       std::cout << "Payload: " << message->payload << std::endl;
+        std::cerr << "Message id: " << message->mid << std::endl;
+        std::cerr << "Topic: " << message->topic << std::endl;
+        std::cerr << "Payload len: " << message->payloadlen << std::endl;
+        std::cerr << "Payload: " << message->payload << std::endl;
+
+        this->response_promise.set_value(RESP_T((const char*)(message->payload)));
     }
 
 	virtual void on_error()
 	{
-		std::cout << "Error callback" << std::endl;
+        std::cerr << "Error callback" << std::endl;
 	}
 
 
@@ -87,6 +98,8 @@ private:
     const std::string publish_topic;
     const std::string subscribe_topic;
     bool start_event_loop;
+
+    std::promise<RESP_T> response_promise;
 };
 
 

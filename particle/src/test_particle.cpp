@@ -358,11 +358,11 @@ int main(int argc, char *argv[])
     }
 	
 	mosquitto_lib_init();
-	RPCClient cli("particle1", "server1", false);
+	RPCClient<std::string, std::string> cli("particle1", "server1", true);
     std::string req("request1");
     std::string response;
     cli.call("particle_filter", req, response);
-    cli.loop_forever();
+	std::cout << "Response: " << response << std::endl;
 
 	return 0;
 }
