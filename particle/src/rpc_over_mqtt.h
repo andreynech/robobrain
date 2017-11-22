@@ -20,17 +20,23 @@ public:
         subscribe_topic(std::string("/") + svr_id + std::string("/") + cli_id + "/response"),
         start_event_loop(start_loop)
     {
-        int mid = 0;
-		int res = connect("127.0.0.1", 1883, 60);
-        std::cout << "Connect returned: " << res << " " << strerror(res) << std::endl;
-        subscribe(&mid, subscribe_topic.c_str());
-        std::cout << "Subscribe returned: " << res << " " << strerror(res) << std::endl;
-        if(start_event_loop)
-        {
-            threaded_set(true);
-            loop_start();
-        }
-    }
+		int mid = 0;
+		int res = connect("localhost", 1883, 60);
+		if (res != 0)
+		{
+			std::cout << "Connect returned: " << res << " " << mosqpp::strerror(res) << std::endl;
+			std::cout << mosqpp::connack_string(res) << std::endl;
+		}
+        res = subscribe(&mid, subscribe_topic.c_str());
+		if (res)
+			std::cout << "Subscribe returned: " << res << " " << mosqpp::strerror(res) << std::endl;
+	
+		if (start_event_loop)
+		{
+			threaded_set(true);
+			loop_start();
+		}
+	}
 
 
     virtual ~RPCClient()
@@ -55,7 +61,8 @@ public:
                           publish_topic.c_str(),
                           buffer.str().size(),
                           buffer.str().c_str());
-        std::cout << "Publish returned: " << res << " " << strerror(res) << std::endl;
+		if(res)
+			std::cout << "Publish returned: " << res << " " << mosqpp::strerror(res) << std::endl;
         return res;
     }
 
@@ -67,6 +74,11 @@ public:
        std::cout << "Payload len: " << message->payloadlen << std::endl;
        std::cout << "Payload: " << message->payload << std::endl;
     }
+
+	virtual void on_error()
+	{
+		std::cout << "Error callback" << std::endl;
+	}
 
 
 private:
