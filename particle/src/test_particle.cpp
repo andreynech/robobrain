@@ -16,22 +16,9 @@
 #include "montecarlo.h"
 #include "rpc_over_mqtt.h"
 
-static const btScalar M_2PI = btScalar(M_PI) * 2;
-
-static btVector4 location(1000, 0, 1000, 0); 
-
-/*
-event = {
-    'triangles': [],
-    'particles': [],
-    'motion': [0.0, 500.0], # delta_theta, s
-    'noise': [30.0, 1.0 * 0.5, 50.0], # bearing, steering, distance
-    'measurements': []
-}
-*/
-
 #define N_BOX 8
 #define N_SENSORS 4
+
 
 struct request_t
 {
@@ -41,6 +28,11 @@ struct request_t
     motion_noise_t noise;
     measurements_t measurements;
 };
+
+static const btScalar M_2PI = btScalar(M_PI) * 2;
+
+static btVector4 location(1000, 0, 1000, 0); 
+
 
 std::ostream& operator << (std::ostream &os, const btVector3 &v)
 {
@@ -359,10 +351,13 @@ int main(int argc, char *argv[])
 	
 	mosquitto_lib_init();
 	RPCClient<std::string, std::string> cli("particle1", "server1", true);
-    std::string req("request1");
-    std::string response;
-    cli.call("particle_filter", req, response);
-	std::cout << "Response: " << response << std::endl;
+    std::string req1("request1");
+	std::string req2("request2");
+	std::string response;
+    cli.call("particle_filter", req1, response);
+	std::cout << "Response1: " << response << std::endl;
+	cli.call("particle_filter", req2, response);
+	std::cout << "Response2: " << response << std::endl;
 
 	return 0;
 }

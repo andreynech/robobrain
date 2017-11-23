@@ -52,7 +52,7 @@ include_directories(${googletest_SOURCE_DIR}/googletest/include
                     ${assimp_BINARY_DIR}/include
                     ${bullet_SOURCE_DIR}/src)
 
-set(FLATBUFFERS_BUILD_GRPCTEST ON CACHE BOOL "" FORCE)
+set(FLATBUFFERS_BUILD_GRPCTEST OFF CACHE BOOL "" FORCE)
 download_project(PROJ                flatbuffers
                  GIT_REPOSITORY      https://github.com/google/flatbuffers.git
                  GIT_TAG             v1.7.1
@@ -65,12 +65,27 @@ link_directories(${googletest_BINARY_DIR}/googletest
                  ${bullet_SOURCE_DIR}/src/LinearMath)
 
 set(SOURCES
+    src/rpc_over_mqtt.h
+    src/geometry3d.cpp src/geometry3d.h
+    src/montecarlo.cpp src/montecarlo.h
+    src/main.cpp)
+
+add_executable(particlefilter ${SOURCES})
+target_link_libraries(particlefilter 
+                      ${BULLET_LIBRARIES}
+                      ${ASSIMP_LIBRARIES}
+                      mosquitto
+                      mosquittopp
+                     )
+
+set(CLI_SOURCES
+    src/rpc_over_mqtt.h
     src/geometry3d.cpp src/geometry3d.h
     src/montecarlo.cpp src/montecarlo.h
     src/test_particle.cpp)
 
-add_executable(particlefilter ${SOURCES})
-target_link_libraries(particlefilter 
+add_executable(test_particle ${CLI_SOURCES})
+target_link_libraries(test_particle 
                       ${BULLET_LIBRARIES}
                       ${ASSIMP_LIBRARIES}
                       mosquitto
