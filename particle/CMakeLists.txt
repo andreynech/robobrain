@@ -25,15 +25,15 @@ add_subdirectory(${bullet_SOURCE_DIR} ${bullet_BINARY_DIR})
 
 
 # Download and configure googletest
-download_project(PROJ                googletest
-                 GIT_REPOSITORY      https://github.com/google/googletest.git
-                 GIT_TAG             master
-                 ${UPDATE_DISCONNECTED_IF_AVAILABLE}
-)
+#download_project(PROJ                googletest
+#                 GIT_REPOSITORY      https://github.com/google/googletest.git
+#                 GIT_TAG             master
+#                 ${UPDATE_DISCONNECTED_IF_AVAILABLE}
+#)
 # Prevent GoogleTest from overriding our compiler/linker options
 # when building with Visual Studio
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
+#set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+#add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
 
 set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 download_project(PROJ                assimp
@@ -43,25 +43,26 @@ download_project(PROJ                assimp
 )
 add_subdirectory(${assimp_SOURCE_DIR} ${assimp_BINARY_DIR})
 
+# GRPC
+download_project(PROJ                grpc
+                 GIT_REPOSITORY      https://github.com/grpc/grpc.git
+                 GIT_TAG             v1.7.x
+                 ${UPDATE_DISCONNECTED_IF_AVAILABLE}
+)
+add_subdirectory(${grpc_SOURCE_DIR} ${grpc_BINARY_DIR})
+
+
 set(BULLET_LIBRARIES LinearMath)
 set(ASSIMP_LIBRARIES assimp)
 
-include_directories(${googletest_SOURCE_DIR}/googletest/include
-                    ${googletest_SOURCE_DIR}/googlemock/include
+include_directories(${grpc_SOURCE_DIR}/third_party/googletest/googletest/include
+                    ${grpc_SOURCE_DIR}/third_party/googletest/googlemock/include
                     ${assimp_SOURCE_DIR}/include
                     ${assimp_BINARY_DIR}/include
                     ${bullet_SOURCE_DIR}/src)
 
-set(FLATBUFFERS_BUILD_GRPCTEST OFF CACHE BOOL "" FORCE)
-download_project(PROJ                flatbuffers
-                 GIT_REPOSITORY      https://github.com/google/flatbuffers.git
-                 GIT_TAG             v1.7.1
-                 ${UPDATE_DISCONNECTED_IF_AVAILABLE}
-)
-add_subdirectory(${flatbuffers_SOURCE_DIR} ${flatbuffers_BINARY_DIR})
-
-link_directories(${googletest_BINARY_DIR}/googletest
-                 ${googletest_BINARY_DIR}/googlemock
+link_directories(${grpc_BINARY_DIR}/googletest
+                 ${grpc_BINARY_DIR}/googlemock
                  ${bullet_SOURCE_DIR}/src/LinearMath)
 
 set(SOURCES
@@ -92,7 +93,7 @@ target_link_libraries(test_particle
                       mosquittopp
                      )
 
-enable_testing()
+#enable_testing()
 
 # Test geometry3d
 add_executable(test_geometry

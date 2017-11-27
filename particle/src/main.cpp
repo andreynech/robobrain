@@ -94,15 +94,6 @@ public:
             std::cerr << "Publish returned: " << res << " " << mosqpp::strerror(res) << std::endl;
         else
             std::cerr << "Publish message id: " << mid << std::endl;
-    }
-};
-
-
-int main(int argc, char *argv[])
-{
-	ParticleServer server("server1");
-    server.run();
-
 /*
 	request_t request;
     request.motion = {0.0, 500.0}; // delta_theta, s
@@ -398,6 +389,15 @@ int main(int argc, char *argv[])
         location.setX(location.x() + 500);
     }
 */
+    }
+};
+
+
+int main(int argc, char *argv[])
+{
+	ParticleServer server("server1");
+    server.run();
+
 	return 0;
 }
 
