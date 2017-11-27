@@ -55,6 +55,7 @@ std::ostream& operator << (std::ostream &os, const box_t &b)
 
 int main(int argc, char *argv[])
 {
+    /*
 	request_t request;
     request.motion = {0.0, 500.0}; // delta_theta, s
     request.noise = {30.0, 1.0 * 0.5, 50.0}; // bearing, steering, distance
@@ -141,12 +142,12 @@ int main(int argc, char *argv[])
         particle.setY(random_uniform(generator) * 3 + bbox.first.y());
         particle.setZ(random_uniform(generator) * world_size.z() + bbox.first.z());
         particle.setW(random_uniform(generator) * M_2PI);
-        /*
-        particle.setX(random_gauss(location.x(), 500));
-        particle.setY(random_gauss(location.y(), 500));
-        particle.setZ(random_gauss(location.z(), 500));
-        particle.setW(random_gauss(location.w(), M_PI_4));
-        */
+
+        //particle.setX(random_gauss(location.x(), 500));
+        //particle.setY(random_gauss(location.y(), 500));
+        //particle.setZ(random_gauss(location.z(), 500));
+        //particle.setW(random_gauss(location.w(), M_PI_4));
+
         //std::cout << particle.x() << "\t" << particle.y() << std::endl;
     }
 
@@ -242,9 +243,9 @@ int main(int argc, char *argv[])
                         part.box.first - part.box.second,
                         part.box.first + part.box.second);
 
-				/*std::cout << "Checking bounding box: " << bb
-					<< " (" << part.bounding_triangles.size() << " triangles)" 
-					<< std::endl;*/
+				//std::cout << "Checking bounding box: " << bb
+				//	<< " (" << part.bounding_triangles.size() << " triangles)" 
+				//	<< std::endl;
 
                 // Check if measurement ray intersects the box.
                 // Only if it does, we will check relevant triangles.
@@ -348,7 +349,7 @@ int main(int argc, char *argv[])
 
         location.setX(location.x() + 500);
     }
-	
+*/	
 	mosquitto_lib_init();
 	RPCClient<std::string, std::string> cli("particle1", "server1", true);
     std::string req1("request1");
@@ -356,8 +357,8 @@ int main(int argc, char *argv[])
 	std::string response;
     cli.call("particle_filter", req1, response);
 	std::cout << "Response1: " << response << std::endl;
-	cli.call("particle_filter", req2, response);
-	std::cout << "Response2: " << response << std::endl;
+	//cli.call("particle_filter", req2, response);
+	//std::cout << "Response2: " << response << std::endl;
 
 	return 0;
 }
