@@ -1,15 +1,15 @@
 #pragma once
 
 #include <LinearMath/btVector3.h>
-#include <array>
+#include <vector>
 #include "geometry3d.h"
 
 
 // Particle count
-#define N_PART  10000
+#define N_PART  5000
 
 typedef btVector4 particle_t;
-typedef std::array<particle_t, N_PART> particle_vector_t;
+typedef std::vector<particle_t> particle_vector_t;
 struct motion_t { btScalar d_theta, s; }; 
 struct motion_noise_t { btScalar bearing, steering, distance; }; 
 struct space_partition_t

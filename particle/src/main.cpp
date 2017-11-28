@@ -95,7 +95,7 @@ public:
             std::cerr << "Publish returned: " << res << " " << mosqpp::strerror(res) << std::endl;
         else
             std::cerr << "Publish message id: " << mid << std::endl;
-
+/*
 
         if(request.mesh.vertices.empty())
         {
@@ -228,6 +228,7 @@ public:
 
         if(request.particles.empty())
         {
+            request.particles.resize(N_PART);
             for(auto &particle: request.particles)
             {
                 particle.setX(random_uniform(generator) * world_size.x() + bbox.first.x());
@@ -239,6 +240,7 @@ public:
                 //particle.setY(random_gauss(location.y(), 500));
                 //particle.setZ(random_gauss(location.z(), 500));
                 //particle.setW(random_gauss(location.w(), M_PI_4));
+                
 
                 //std::cout << particle.x() << "\t" << particle.y() << std::endl;
             }
@@ -351,7 +353,7 @@ public:
             }
 
             // Resampling
-            static particle_vector_t p2;
+            particle_vector_t p2(request.particles.size());
             particle_vector_t::size_type index = 
                 particle_vector_t::size_type(random_uniform(generator)
                                              * request.particles.size());
@@ -389,6 +391,7 @@ public:
 
             location.setX(location.x() + 500);
         }
+*/
     }
 
 protected:

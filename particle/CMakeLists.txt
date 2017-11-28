@@ -51,33 +51,25 @@ download_project(PROJ                grpc
 )
 add_subdirectory(${grpc_SOURCE_DIR} ${grpc_BINARY_DIR})
 
+if (MSVC)
+  add_definitions(-D_WIN32_WINNT=0x600)
+endif()
 
 set(BULLET_LIBRARIES LinearMath)
 set(ASSIMP_LIBRARIES assimp)
 
 include_directories(${grpc_SOURCE_DIR}/third_party/googletest/googletest/include
                     ${grpc_SOURCE_DIR}/third_party/googletest/googlemock/include
+                    ${grpc_SOURCE_DIR}/third_party/protobuf/src
+                    ${grpc_SOURCE_DIR}/include
                     ${assimp_SOURCE_DIR}/include
                     ${assimp_BINARY_DIR}/include
                     ${bullet_SOURCE_DIR}/src)
 
-link_directories(${grpc_BINARY_DIR}/googletest
+link_directories(${PROJECT_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}
+                 ${grpc_BINARY_DIR}/googletest
                  ${grpc_BINARY_DIR}/googlemock
                  ${bullet_SOURCE_DIR}/src/LinearMath)
-
-set(SOURCES
-    src/rpc_over_mqtt.h
-    src/geometry3d.cpp src/geometry3d.h
-    src/montecarlo.cpp src/montecarlo.h
-    src/main.cpp)
-
-add_executable(particlefilter ${SOURCES})
-target_link_libraries(particlefilter 
-                      ${BULLET_LIBRARIES}
-                      ${ASSIMP_LIBRARIES}
-                      mosquitto
-                      mosquittopp
-                     )
 
 set(CLI_SOURCES
     src/rpc_over_mqtt.h
@@ -85,20 +77,85 @@ set(CLI_SOURCES
     src/montecarlo.cpp src/montecarlo.h
     src/test_particle.cpp)
 
-add_executable(test_particle ${CLI_SOURCES})
-target_link_libraries(test_particle 
+set(PB_SRCS
+    protos-src/particlefilter.pb.cc
+    protos-src/particlefilter.pb.h)
+
+set(GRPC_SRCS
+    protos-src/particlefilter.grpc.pb.cc
+    protos-src/particlefilter.grpc.pb.h)
+
+file(MAKE_DIRECTORY protos-src)
+
+set(PROTO_FILE particlefilter.proto)
+
+add_custom_command(
+    OUTPUT ${PB_SRCS}
+    COMMAND "${grpc_BINARY_DIR}/third_party/protobuf/$<CONFIG>/protoc"
+    ARGS --cpp_out=${PROJECT_BINARY_DIR}/protos-src --proto_path=${PROJECT_SOURCE_DIR}/protos ${PROJECT_SOURCE_DIR}/protos/${PROTO_FILE}
+    DEPENDS ${PROJECT_SOURCE_DIR}/protos/${PROTO_FILE}
+    COMMENT "Running C++ protocol buffer compiler on ${PROTO_FILE}"
+    VERBATIM)
+
+add_custom_command(
+    OUTPUT ${GRPC_SRCS}
+    COMMAND "${grpc_BINARY_DIR}/third_party/protobuf/$<CONFIG>/protoc"
+    ARGS --grpc_out=${PROJECT_BINARY_DIR}/protos-src --proto_path=${PROJECT_SOURCE_DIR}/protos --plugin=protoc-gen-grpc=${grpc_BINARY_DIR}/Debug/grpc_cpp_plugin${CMAKE_EXECUTABLE_SUFFIX} ${PROJECT_SOURCE_DIR}/protos/${PROTO_FILE}
+    DEPENDS ${PROJECT_SOURCE_DIR}/protos/${PROTO_FILE}
+    COMMENT "Running C++ gRPC compiler on ${PROTO_FILE}"
+    VERBATIM)
+
+set(SOURCES
+    src/rpc_over_mqtt.h
+    src/geometry3d.cpp src/geometry3d.h
+    src/montecarlo.cpp src/montecarlo.h
+    src/main.cpp)
+
+add_executable(particlefilter ${SOURCES} ${PB_SRCS} ${GRPC_SRCS})
+target_link_libraries(particlefilter 
                       ${BULLET_LIBRARIES}
                       ${ASSIMP_LIBRARIES}
+
+                      debug libprotobuf${protobuf_DEBUG_POSTFIX}
+                      debug grpc${CMAKE_DEBUG_POSTFIX}
+                      debug grpc++${CMAKE_DEBUG_POSTFIX}
+
+                      optimized libprotobuf
+                      optimized grpc
+                      optimized grpc++
+
                       mosquitto
                       mosquittopp
                      )
 
-#enable_testing()
+add_executable(test_particle ${CLI_SOURCES} ${PB_SRCS} ${GRPC_SRCS})
+
+target_link_libraries(test_particle 
+                      ${BULLET_LIBRARIES}
+                      ${ASSIMP_LIBRARIES}
+
+                      debug libprotobuf${protobuf_DEBUG_POSTFIX}
+                      debug grpc${CMAKE_DEBUG_POSTFIX}
+                      debug grpc++${CMAKE_DEBUG_POSTFIX}
+
+                      optimized libprotobuf
+                      optimized grpc
+                      optimized grpc++
+
+                      mosquitto
+                      mosquittopp
+                     )
+
+enable_testing()
 
 # Test geometry3d
 add_executable(test_geometry
                src/geometry3d.cpp src/geometry3d.h
                src/test_geometry.cpp)
-target_link_libraries(test_geometry gtest gmock_main)
+target_link_libraries(test_geometry
+                debug gtest${CMAKE_DEBUG_POSTFIX}
+                debug gmock_main${CMAKE_DEBUG_POSTFIX}
+                optimized gtest
+                optimized gmock_main)
 add_test(NAME test_geometry COMMAND test_geometry)
 
