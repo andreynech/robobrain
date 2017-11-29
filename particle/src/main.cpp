@@ -72,7 +72,6 @@ public:
     virtual void on_message(const struct mosquitto_message *message)
     {
         particle::LocRequest loc_request;
-        std::string buffer;
         particle::EstimatedLocation response;
 
         bool ok = loc_request.ParseFromArray(message->payload, message->payloadlen);
@@ -83,7 +82,8 @@ public:
         else
         {
             // Process request
-/*
+
+
             if(request.mesh.vertices.empty())
             {
                 // Create an instance of the Importer class
@@ -91,7 +91,7 @@ public:
                 // And have it read the given file with some example postprocessing
                 // Usually - if speed is not the most important aspect for you - you'll 
                 // propably to request more postprocessing than we do in this example.
-                const aiScene* scene = importer.ReadFile("room.obj", 
+                const aiScene* scene = importer.ReadFile(loc_request.map_location(), 
                                //aiProcess_FlipWindingOrder       |
                                //aiProcess_CalcTangentSpace       | 
                                aiProcess_Triangulate            |
@@ -110,7 +110,7 @@ public:
                 if(!scene)
                 {
                     std::cout << importer.GetErrorString() << std::endl;
-                    return;
+                    response.set_error(importer.GetErrorString());
                 }
 
                 //std::cout << scene->mNumMeshes << " " << scene->mRootNode->mNumMeshes << std::endl;
@@ -236,157 +236,102 @@ public:
 
             std::array<btScalar, N_PART> weights;
             const btVector3 init_dir(1.0, 0.0, 0.0);
-            request.measurements.resize(N_SENSORS);
-            btScalar min_dist;
+            //btScalar min_dist;
             btVector3 origin;
             btVector3 xpoint;
 
-            for(size_t step = 0; step < 8; ++step)
+            request.measurements.resize(loc_request.measurements_size());
+            int idx = 0;
+            for(measurement_t &meas: request.measurements)
             {
-                // Simulate measurements
-                for(size_t s = 0; s < N_SENSORS; ++s) // generate sensor directions
-                {
-                    rotateY(init_dir, M_2PI / N_SENSORS * s, request.measurements[s].direction);
-                }
+                const particle::measurement &new_meas = loc_request.measurements(idx);
+                meas.direction.setX(new_meas.direction().x());
+                meas.direction.setY(new_meas.direction().y());
+                meas.direction.setZ(new_meas.direction().z());
 
-                size_t m = 0;
-                for(measurement_t &meas: request.measurements)
-                {
-                    ++m;
-                    std::cout << "*************** Step: " << step << "  Measurement: " << m << std::endl;
-                    meas.origin = btVector3(0.0, 300.0, 0.0);
-                    origin = location + meas.origin;
-                    std::cout << "Origin: " << origin 
-                              << "  direction: " <<  meas.direction 
-                              << std::endl;
+                meas.origin.setX(new_meas.origin().x());
+                meas.origin.setY(new_meas.origin().y());
+                meas.origin.setZ(new_meas.origin().z());
 
-                    min_dist = (-std::numeric_limits<btScalar>::infinity());
-                    //triangles_processed = 0;
-                    for(const auto &part: partitions)
-                    {
-                        //std::cout << "Triangles in partition: " << part.bounding_triangles.size() << std::endl;
-                        // build "bounding box" style box
-                        // .first is the middle of the box
-                        // .second is half size
-                        box_t bb = std::make_pair(
-                                part.box.first - part.box.second,
-                                part.box.first + part.box.second);
+                meas.distance = new_meas.distance();
 
-                        //std::cout << "Checking bounding box: " << bb
-                        //          << " (" << part.bounding_triangles.size() << " triangles)" 
-                        //          << std::endl;
-
-                        // Check if measurement ray intersects the box.
-                        // Only if it does, we will check relevant triangles.
-                        if(boxrayintersect(bb, origin, meas.direction, xpoint))
-                        {
-                            //std:: cout << "       - intersection" << std::endl;
-
-                            for(const auto &vx: part.bounding_triangles)
-                            {
-                                const triangleidx_t &tri_verts_idx = 
-                                    request.mesh.triangles[vx];
-                                const btVector3 &vert0 = 
-                                    request.mesh.vertices[tri_verts_idx[0]];
-
-                                const btVector3 &edge1 = request.mesh.edges[vx][0];
-                                const btVector3 &edge2 = request.mesh.edges[vx][1];
-
-                                //triangles_processed += 1;
-                                bool x = intersect_triangle(origin, meas.direction, 
-                                                            vert0, edge1, edge2,
-                                                            xpoint, false);
-                                btScalar t = xpoint.x();
-                                if(x && t > 0)
-                                {
-                                    //std::cout << "Intersection with tirangle # " << vx << std::endl;
-                                    if(min_dist == (-std::numeric_limits<btScalar>::infinity()) 
-                                       || t < min_dist)
-                                    {
-                                        min_dist = t;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    meas.distance = min_dist;
-                    //std::cout << "Processed triangles: " << triangles_processed << std::endl;
-                    std::cout << "Location/distance: " << location << " / " << min_dist << std::endl;
-                }
-
-                // Measurement update
-                size_t n = 0;
-                for(const particle_t &particle: request.particles)
-                {
-                    weights[n] = measurement_prob(partitions, 
-                                                  request.mesh, 
-                                                  particle, 
-                                                  request.measurements, 
-                                                  request.noise);
-                    //std::cout << weights[n] << std::endl;
-                    ++n;
-                }
-
-                // Normalization
-                btScalar sum_weights = btScalar(0.0);
-                for(const auto &w: weights)
-                    sum_weights += w;
-                std::cout << "Sum(weights): " << sum_weights << std::endl;
-                if(sum_weights > 0)
-                {
-                    btScalar k = request.particles.size() / sum_weights;
-                    for(auto &w: weights)
-                        w *= k;
-                }
-
-                // Resampling
-                particle_vector_t p2(request.particles.size());
-                particle_vector_t::size_type index = 
-                    particle_vector_t::size_type(random_uniform(generator)
-                                                 * request.particles.size());
-                btScalar beta = 0.0;
-                const btScalar two_mw = 
-                    btScalar(2.0) * (*std::max_element(weights.begin(), weights.end()));
-                for(particle_vector_t::size_type i = 0; i < request.particles.size(); ++i)
-                {
-                    beta += random_uniform(generator) * two_mw;
-                    while(beta > weights[index])
-                    {
-                        beta -= weights[index];
-                        index = (index + 1) % request.particles.size();
-                    }
-                    p2[i] = request.particles[index];
-                }
-
-                //for(const auto &p: p2) std::cout << p << std::endl;
-                //std::cout << std::endl;
-
-                particle_t est_pos;
-                //get_position(request.particles, est_pos);
-                get_position(p2, est_pos);
-                std::cout << "** Estimated position: " << est_pos << std::endl;
-
-                //visualization(location, est_pos, step, particles, p2, weights)
-
-                request.particles = p2;
-
-                std::cout << "======== " << step << " ========" << std::endl;
-
-                // Motion update (prediction)
-                for(auto &p: request.particles)
-                    move(p, request.motion, request.noise, p);
-
-                location.setX(location.x() + 500);
+                ++idx;
             }
-*/
-			particle::vector4 *loc = response.mutable_location();
-            loc->set_x(1);
-            loc->set_y(2);
-            loc->set_z(3);
-            loc->set_w(4);
+
+            // Measurement update
+            size_t n = 0;
+            for(const particle_t &particle: request.particles)
+            {
+                weights[n] = measurement_prob(partitions, 
+                                              request.mesh, 
+                                              particle, 
+                                              request.measurements, 
+                                              request.noise);
+                //std::cout << weights[n] << std::endl;
+                ++n;
+            }
+
+            // Normalization
+            btScalar sum_weights = btScalar(0.0);
+            for(const auto &w: weights)
+                sum_weights += w;
+            std::cout << "Sum(weights): " << sum_weights << std::endl;
+            if(sum_weights > 0)
+            {
+                btScalar k = request.particles.size() / sum_weights;
+                for(auto &w: weights)
+                    w *= k;
+            }
+
+            // Resampling
+            particle_vector_t p2(request.particles.size());
+            particle_vector_t::size_type index = 
+                particle_vector_t::size_type(random_uniform(generator)
+                                             * request.particles.size());
+            btScalar beta = 0.0;
+            const btScalar two_mw = 
+                btScalar(2.0) * (*std::max_element(weights.begin(), weights.end()));
+            for(particle_vector_t::size_type i = 0; i < request.particles.size(); ++i)
+            {
+                beta += random_uniform(generator) * two_mw;
+                while(beta > weights[index])
+                {
+                    beta -= weights[index];
+                    index = (index + 1) % request.particles.size();
+                }
+                p2[i] = request.particles[index];
+            }
+
+            //for(const auto &p: p2) std::cout << p << std::endl;
+            //std::cout << std::endl;
+
+            particle_t est_pos;
+            //get_position(request.particles, est_pos);
+            get_position(p2, est_pos);
+            std::cout << "** Estimated position: " << est_pos << std::endl;
+
+            particle::vector4 *loc = response.mutable_location();
+            loc->set_x(est_pos.x());
+            loc->set_y(est_pos.y());
+            loc->set_z(est_pos.z());
+            loc->set_w(est_pos.w());
+
+            //visualization(location, est_pos, step, particles, p2, weights)
+
+            request.particles = p2;
+
+            //std::cout << "======== " << step << " ========" << std::endl;
+
+            // Motion update (prediction)
+            for(auto &p: request.particles)
+                move(p, request.motion, request.noise, p);
+
+            location.setX(location.x() + 500);
+
             response.set_error(""); // No error
         }
 
+        std::string buffer;
         ok = response.SerializeToString(&buffer);
         if(!ok)
         {
