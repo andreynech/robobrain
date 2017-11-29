@@ -58,13 +58,16 @@ endif()
 set(BULLET_LIBRARIES LinearMath)
 set(ASSIMP_LIBRARIES assimp)
 
+file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/protos-src)
+
 include_directories(${grpc_SOURCE_DIR}/third_party/googletest/googletest/include
                     ${grpc_SOURCE_DIR}/third_party/googletest/googlemock/include
                     ${grpc_SOURCE_DIR}/third_party/protobuf/src
                     ${grpc_SOURCE_DIR}/include
                     ${assimp_SOURCE_DIR}/include
                     ${assimp_BINARY_DIR}/include
-                    ${bullet_SOURCE_DIR}/src)
+                    ${bullet_SOURCE_DIR}/src
+                    ${PROJECT_BINARY_DIR}/protos-src)
 
 link_directories(${PROJECT_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}
                  ${grpc_BINARY_DIR}/googletest
@@ -84,8 +87,6 @@ set(PB_SRCS
 set(GRPC_SRCS
     protos-src/particlefilter.grpc.pb.cc
     protos-src/particlefilter.grpc.pb.h)
-
-file(MAKE_DIRECTORY protos-src)
 
 set(PROTO_FILE particlefilter.proto)
 

@@ -16,6 +16,8 @@
 #include "montecarlo.h"
 #include "rpc_over_mqtt.h"
 
+#include <particlefilter.grpc.pb.h>
+
 #define N_BOX 8
 #define N_SENSORS 4
 
@@ -55,6 +57,19 @@ std::ostream& operator << (std::ostream &os, const box_t &b)
 
 int main(int argc, char *argv[])
 {
+    // Verify that the version of the library that we linked against is
+    // compatible with the version of the headers we compiled against.
+    GOOGLE_PROTOBUF_VERIFY_VERSION;
+
+    particle::LocRequest request;
+
+    request.set_map_location("room.obj");
+    request.set_d_theta(0.0f);
+    request.set_s(500.0f);
+    request.set_bearing_noise(30.0f);
+    request.set_steering_noise(1.0f * 0.5);
+    request.set_distance_noise(50.0);
+
     /*
 	request_t request;
     request.motion = {0.0, 500.0}; // delta_theta, s
@@ -351,14 +366,20 @@ int main(int argc, char *argv[])
     }
 */	
 	mosquitto_lib_init();
-	RPCClient<std::string, std::string> cli("particle1", "server1", true);
-    std::string req1("request1");
-	std::string req2("request2");
-	std::string response;
-    cli.call("particle_filter", req1, response);
-	std::cout << "Response1: " << response << std::endl;
+	RPCClient cli("particle1", "server1", true);
+    particle::EstimatedLocation response;
+
+    cli.call("particle_filter", &request, &response);
+	std::cout << "Response error: " << (response.error().empty() ? "OK" : response.error()) << std::endl;
+    std::cout << "X: " << response.location().x() 
+              << " Y: " << response.location().y() 
+              << " Z: " << response.location().z()
+              << " W: " << response.location().w() << std::endl;
 	//cli.call("particle_filter", req2, response);
 	//std::cout << "Response2: " << response << std::endl;
+
+    // Delete all global objects allocated by libprotobuf.
+    google::protobuf::ShutdownProtobufLibrary();
 
 	return 0;
 }

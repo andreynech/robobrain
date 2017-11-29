@@ -6,8 +6,9 @@
 #include <iostream>
 #include "mosquittopp.h"
 
+#include <google/protobuf/message.h>
 
-template <typename REQ_T, typename RESP_T>
+
 class RPCClient : public mosqpp::mosquittopp
 {
 public:
@@ -51,16 +52,23 @@ public:
 public:
 
     int call(const std::string &method_name, 
-             const REQ_T &request,
-             RESP_T &response)
+             const google::protobuf::Message *request,
+             google::protobuf::Message *response)
     {
-        std::ostringstream buffer;
-        buffer << request;
+        std::string buffer;
+        bool ok = request->SerializeToString(&buffer);
+        if(!ok)
+        {
+            std::cerr << "Request serialization error" << std::endl;
+            return -1;
+        }
+
         int mid = 0;
+        this->response_ptr = response;
         int res = publish(&mid, 
                           publish_topic.c_str(),
-                          buffer.str().size(),
-                          buffer.str().c_str());
+                          buffer.size(),
+                          buffer.c_str());
         if(res)
         {
             std::cerr << "Publish returned: " << res << " " << mosqpp::strerror(res) << std::endl;
@@ -68,9 +76,11 @@ public:
         else
         {
             std::cerr << "Publish message id: " << mid << std::endl;
-            std::future<RESP_T> response_future = this->response_promise.get_future();
+            std::future<bool> response_future = this->response_promise.get_future();
             response_future.wait();
-            response = response_future.get();
+            ok = response_future.get();
+            if(!ok)
+                res = -2;
             // "Reinitialize" promise for the next call
             response_promise = response_promise_t();
 		}
@@ -86,7 +96,9 @@ public:
         std::cerr << "Payload len: " << message->payloadlen << std::endl;
         std::cerr << "Payload: " << message->payload << std::endl;
 
-        this->response_promise.set_value(RESP_T((const char*)(message->payload)));
+        bool ok = response_ptr->ParseFromArray(message->payload, message->payloadlen);
+        
+        this->response_promise.set_value(ok);
     }
 
 	virtual void on_error()
@@ -102,12 +114,12 @@ private:
     const std::string subscribe_topic;
     bool start_event_loop;
 
-    typedef std::promise<RESP_T> response_promise_t;
+    typedef std::promise<bool> response_promise_t;
     response_promise_t response_promise;
+    google::protobuf::Message *response_ptr;
 };
 
 
-template <typename REQ_T, typename RESP_T>
 class RPCServer : public mosqpp::mosquittopp
 {
 public:
