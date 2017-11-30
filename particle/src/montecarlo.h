@@ -6,7 +6,7 @@
 
 
 // Particle count
-#define N_PART  5000
+#define N_PART  10000
 
 typedef btVector4 particle_t;
 typedef std::vector<particle_t> particle_vector_t;

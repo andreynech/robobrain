@@ -60,8 +60,6 @@ public:
     ParticleServer(const std::string &svr_id)
         : RPCServer(svr_id)
     {
-        //request.motion = {0.0, 500.0}; // delta_theta, s
-        //request.noise = {30.0, 1.0 * 0.5, 50.0}; // bearing, steering, distance
     }
 
 
@@ -211,9 +209,7 @@ public:
             std::default_random_engine generator(seed1);
             std::uniform_real_distribution<btScalar> random_uniform(0.0, 1.0);
 
-            btVector4 location(1000, 0, 1000, 0); 
-
-            if(request.particles.empty())
+            if(loc_request.particles_size() == 0)
             {
                 request.particles.resize(N_PART);
                 for(auto &particle: request.particles)
@@ -232,7 +228,21 @@ public:
                     //std::cout << particle.x() << "\t" << particle.y() << std::endl;
                 }
             }
-
+            else
+            {
+                request.particles.resize(loc_request.particles_size());
+                size_t i = 0;
+                for(auto &particle: request.particles)
+                {
+                    const particle::vector4 &new_particle = 
+                        loc_request.particles(i);
+                    particle.setX(new_particle.x());
+                    particle.setY(new_particle.y());
+                    particle.setZ(new_particle.z());
+                    particle.setW(new_particle.w());
+                    ++i;
+                }
+            }
 
             std::array<btScalar, N_PART> weights;
             const btVector3 init_dir(1.0, 0.0, 0.0);
@@ -257,6 +267,14 @@ public:
 
                 ++idx;
             }
+
+            request.motion = {
+                loc_request.d_theta(), 
+                loc_request.s()}; // delta_theta, s
+            request.noise = {
+                loc_request.bearing_noise(),
+                loc_request.steering_noise(),
+                loc_request.distance_noise()}; // bearing, steering, distance
 
             // Measurement update
             size_t n = 0;
@@ -326,7 +344,20 @@ public:
             for(auto &p: request.particles)
                 move(p, request.motion, request.noise, p);
 
-            location.setX(location.x() + 500);
+            // Copy particle vector to response to let the client keep
+            // current state
+            response.clear_particles();
+            size_t i = 0;
+            for(auto &particle: request.particles)
+            {
+                particle::vector4 *new_particle = 
+                    response.add_particles();
+                new_particle->set_x(particle.x());
+                new_particle->set_y(particle.y());
+                new_particle->set_z(particle.z());
+                new_particle->set_w(particle.w());
+                ++i;
+            }
 
             response.set_error(""); // No error
         }

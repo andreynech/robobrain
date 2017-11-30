@@ -1,7 +1,5 @@
 #include <iostream>
 #include <cassert>
-#include <chrono>
-#include <random>
 #include <algorithm>
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -61,22 +59,22 @@ int main(int argc, char *argv[])
     // compatible with the version of the headers we compiled against.
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-    particle::LocRequest request;
+	mosquitto_lib_init();
+    RPCClient cli("particle1", "server1", true);
 
-    request.set_map_location("room.obj");
-    request.set_d_theta(0.0f);
-    request.set_s(500.0f);
-    request.set_bearing_noise(30.0f);
-    request.set_steering_noise(1.0f * 0.5);
-    request.set_distance_noise(50.0);
+    particle::LocRequest loc_request;
+    particle::EstimatedLocation response;
 
-    /*
+    loc_request.set_map_location("room.obj");
+    loc_request.set_d_theta(0.0f);
+    loc_request.set_s(500.0f);
+    loc_request.set_bearing_noise(30.0f);
+    loc_request.set_steering_noise(1.0f * 0.5);
+    loc_request.set_distance_noise(50.0);
+
 	request_t request;
-    request.motion = {0.0, 500.0}; // delta_theta, s
-    request.noise = {30.0, 1.0 * 0.5, 50.0}; // bearing, steering, distance
 
-
-    {
+	{
     // Create an instance of the Importer class
     Assimp::Importer importer;
     // And have it read the given file with some example postprocessing
@@ -146,26 +144,6 @@ int main(int argc, char *argv[])
 	std::cout << "Vertex count: " << request.mesh.vertices.size() << std::endl;
 	std::cout << "Triangle count: " << request.mesh.triangles.size() << std::endl;
 
-    static const unsigned seed1 = 
-		unsigned(std::chrono::system_clock::now().time_since_epoch().count());
-    std::default_random_engine generator(seed1);
-    std::uniform_real_distribution<btScalar> random_uniform(0.0, 1.0);
-
-    for(auto &particle: request.particles)
-    {
-        particle.setX(random_uniform(generator) * world_size.x() + bbox.first.x());
-        particle.setY(random_uniform(generator) * 3 + bbox.first.y());
-        particle.setZ(random_uniform(generator) * world_size.z() + bbox.first.z());
-        particle.setW(random_uniform(generator) * M_2PI);
-
-        //particle.setX(random_gauss(location.x(), 500));
-        //particle.setY(random_gauss(location.y(), 500));
-        //particle.setZ(random_gauss(location.z(), 500));
-        //particle.setW(random_gauss(location.w(), M_PI_4));
-
-        //std::cout << particle.x() << "\t" << particle.y() << std::endl;
-    }
-
     // Split the world evenly with boxes
     btScalar box_x_size = world_size.x() / N_BOX;
     btScalar box_y_size = world_size.y();
@@ -220,14 +198,14 @@ int main(int argc, char *argv[])
     }
     std::cout << "Total triangles in boxes:" << triangles_processed << std::endl;
 
-    std::array<btScalar, N_PART> weights;
     const btVector3 init_dir(1.0, 0.0, 0.0);
     request.measurements.resize(N_SENSORS);
     btScalar min_dist;
     btVector3 origin;
     btVector3 xpoint;
 
-    for(size_t step = 0; step < 8; ++step)
+	size_t step = 0;
+    for(; step < 8; ++step)
     {
         // Simulate measurements
         for(size_t s = 0; s < N_SENSORS; ++s) // generate sensor directions
@@ -300,83 +278,48 @@ int main(int argc, char *argv[])
             std::cout << "Location/distance: " << location << " / " << min_dist << std::endl;
         }
 
-        // Measurement update
-        size_t n = 0;
-        for(const particle_t &particle: request.particles)
+        location.setX(location.x() + loc_request.s());
+
+        loc_request.clear_measurements();
+        for(measurement_t &meas: request.measurements)
         {
-            weights[n] = measurement_prob(partitions, 
-                                          request.mesh, 
-                                          particle, 
-                                          request.measurements, 
-                                          request.noise);
-            //std::cout << weights[n] << std::endl;
-            ++n;
+            particle::measurement *new_meas = loc_request.add_measurements();
+            particle::vector3 *dir = new_meas->mutable_direction();
+            dir->set_x(meas.direction.x());
+            dir->set_y(meas.direction.y());
+            dir->set_z(meas.direction.z());
+
+            particle::vector3 *orig = new_meas->mutable_origin();
+            orig->set_x(meas.origin.x());
+            orig->set_y(meas.origin.y());
+            orig->set_z(meas.origin.z());
+
+            new_meas->set_distance(meas.distance);
         }
 
-        // Normalization
-        btScalar sum_weights = btScalar(0.0);
-        for(const auto &w: weights)
-            sum_weights += w;
-        std::cout << "Sum(weights): " << sum_weights << std::endl;
-        if(sum_weights > 0)
+        if(response.particles_size() > 0)
         {
-            btScalar k = request.particles.size() / sum_weights;
-            for(auto &w: weights)
-                w *= k;
-        }
-
-        // Resampling
-        static particle_vector_t p2;
-        particle_vector_t::size_type index = 
-            particle_vector_t::size_type(random_uniform(generator)
-                                         * request.particles.size());
-        btScalar beta = 0.0;
-        const btScalar two_mw = 
-            btScalar(2.0) * (*std::max_element(weights.begin(), weights.end()));
-        for(particle_vector_t::size_type i = 0; i < request.particles.size(); ++i)
-        {
-            beta += random_uniform(generator) * two_mw;
-            while(beta > weights[index])
+            loc_request.clear_particles();
+            for(int i = 0; i < response.particles_size(); ++i)
             {
-                beta -= weights[index];
-                index = (index + 1) % request.particles.size();
+                const particle::vector4 &p = response.particles(i);
+                particle::vector4 *new_p = loc_request.add_particles();
+                new_p->set_x(p.x());
+                new_p->set_y(p.y());
+                new_p->set_z(p.z());
+                new_p->set_w(p.w());
             }
-            p2[i] = request.particles[index];
         }
 
-        //for(const auto &p: p2) std::cout << p << std::endl;
-        //std::cout << std::endl;
-
-        particle_t est_pos;
-        //get_position(request.particles, est_pos);
-        get_position(p2, est_pos);
-        std::cout << "** Estimated position: " << est_pos << std::endl;
-
-        //visualization(location, est_pos, step, particles, p2, weights)
-
-        request.particles = p2;
-
-        std::cout << "======== " << step << " ========" << std::endl;
-
-        // Motion update (prediction)
-        for(auto &p: request.particles)
-            move(p, request.motion, request.noise, p);
-
-        location.setX(location.x() + 500);
+        cli.call("particle_filter", &loc_request, &response);
+        std::cout << "Response error: " << (response.error().empty() ? "OK" : response.error()) << std::endl;
+        std::cout << "X: " << response.location().x() 
+                  << " Y: " << response.location().y() 
+                  << " Z: " << response.location().z()
+                  << " W: " << response.location().w() << std::endl;
+        //cli.call("particle_filter", req2, response);
+        //std::cout << "Response2: " << response << std::endl;
     }
-*/	
-	mosquitto_lib_init();
-	RPCClient cli("particle1", "server1", true);
-    particle::EstimatedLocation response;
-
-    cli.call("particle_filter", &request, &response);
-	std::cout << "Response error: " << (response.error().empty() ? "OK" : response.error()) << std::endl;
-    std::cout << "X: " << response.location().x() 
-              << " Y: " << response.location().y() 
-              << " Z: " << response.location().z()
-              << " W: " << response.location().w() << std::endl;
-	//cli.call("particle_filter", req2, response);
-	//std::cout << "Response2: " << response << std::endl;
 
     // Delete all global objects allocated by libprotobuf.
     google::protobuf::ShutdownProtobufLibrary();
