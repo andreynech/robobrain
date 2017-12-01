@@ -110,6 +110,7 @@ set(SOURCES
     src/rpc_over_mqtt.h
     src/geometry3d.cpp src/geometry3d.h
     src/montecarlo.cpp src/montecarlo.h
+    src/process_nav_request.cpp src/process_nav_request.h
     src/main.cpp)
 
 add_executable(particlefilter ${SOURCES} ${PB_SRCS} ${GRPC_SRCS})

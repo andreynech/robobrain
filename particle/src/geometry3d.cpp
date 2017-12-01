@@ -4,6 +4,25 @@
 #include <cassert>
 #include <cmath>
 
+std::ostream& operator << (std::ostream &os, const btVector3 &v)
+{
+    os << v.x() << " " << v.y() << " " << v.z();
+    return os;
+}
+
+std::ostream& operator << (std::ostream &os, const btVector4 &v)
+{
+    os << v.x() << " " << v.y() << " " << v.z() << " " << v.w();
+    return os;
+}
+
+std::ostream& operator << (std::ostream &os, const box_t &b)
+{
+    os << "[" << b.first << ", " << b.second << "]";
+    return os;
+}
+
+
 
 // Calculates 3D bounding box of the mesh.
 // Sets bbox tuple to (min_coord, max_coord)

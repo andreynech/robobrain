@@ -27,6 +27,9 @@ struct mesh_t
     edge_vector_t edges;
 };
 
+std::ostream& operator << (std::ostream &os, const btVector3 &v);
+std::ostream& operator << (std::ostream &os, const btVector4 &v);
+std::ostream& operator << (std::ostream &os, const box_t &b);
 
 // Calculates 3D bounding box of the mesh.
 // Sets bbox tuple to (min_coord, max_coord)

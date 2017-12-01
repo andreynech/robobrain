@@ -1,16 +1,11 @@
 #include <iostream>
-#include <cassert>
-#include <algorithm>
 #define _USE_MATH_DEFINES
 #include <math.h>
-#include <cmath>
-#include <limits>
 
 #include <assimp/Importer.hpp>  // C++ importer interface
 #include <assimp/scene.h>       // Output data structure
 #include <assimp/postprocess.h> // Post processing flags
 
-#include "geometry3d.h"
 #include "montecarlo.h"
 #include "rpc_over_mqtt.h"
 
@@ -29,28 +24,9 @@ struct request_t
     measurements_t measurements;
 };
 
-static const btScalar M_2PI = btScalar(M_PI) * 2;
 
 static btVector4 location(1000, 0, 1000, 0); 
 
-
-std::ostream& operator << (std::ostream &os, const btVector3 &v)
-{
-    os << v.x() << " " << v.y() << " " << v.z();
-    return os;
-}
-
-std::ostream& operator << (std::ostream &os, const btVector4 &v)
-{
-    os << v.x() << " " << v.y() << " " << v.z() << " " << v.w();
-    return os;
-}
-
-std::ostream& operator << (std::ostream &os, const box_t &b)
-{
-    os << "[" << b.first << ", " << b.second << "]";
-    return os;
-}
 
 
 int main(int argc, char *argv[])
@@ -210,7 +186,9 @@ int main(int argc, char *argv[])
         // Simulate measurements
         for(size_t s = 0; s < N_SENSORS; ++s) // generate sensor directions
         {
-            rotateY(init_dir, M_2PI / N_SENSORS * s, request.measurements[s].direction);
+            rotateY(init_dir, 
+                    btScalar(M_PI) * 2 / N_SENSORS * s, 
+                    request.measurements[s].direction);
         }
 
         size_t m = 0;
