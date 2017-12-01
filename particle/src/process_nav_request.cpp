@@ -30,7 +30,7 @@ void par_for(B begin, B end, F fn) {
   idx = begin;
 
   size_t num_cpus = std::thread::hardware_concurrency();
-  std::vector<std::future<> > futures(num_cpus);
+  std::vector<std::future<std::result_of_t<std::decay_t<F>(B, size_t)>> > futures(num_cpus);
   for(size_t cpu = 0; cpu != num_cpus; ++cpu) {
     futures[cpu] = std::async(
       std::launch::async,
