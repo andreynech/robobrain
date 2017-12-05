@@ -1,6 +1,10 @@
 #include <iostream>
+#include <list>
 #include "rpc_over_mqtt.h"
 #include "process_nav_request.h"
+
+
+#define CACHE_SIZE 100
 
 
 class ParticleServer : public RPCServer
@@ -34,7 +38,30 @@ public:
             + std::string("/response");
         std::cout << "Publish topic: " << publish_topic << std::endl;
 
-        bool ok = processLocRequest(loc_request, response, request,
+        request_cache_t::iterator search = cache.find(client_id);
+        if(search == cache.end())
+        {
+            std::cout << "Cache miss" << std::endl;
+            if(evictor_list.size() > CACHE_SIZE)            
+            {
+                // We need to remove LRU element
+                request_cache_t::const_iterator lru = evictor_list.back();
+                evictor_list.pop_back();
+                cache.erase(lru);
+            }
+            auto res = cache.emplace(client_id, request_t());
+            search = res.first;
+        }
+        else
+        {
+            std::cout << "Cache hit" << std::endl;
+            // Move requested element to the head of evictor list (MRU)
+            evictor_list.remove(search);
+        }
+        evictor_list.push_front(search);
+        std::cout << "Evictor list size: " << evictor_list.size() << std::endl;
+
+        bool ok = processLocRequest(loc_request, response, search->second,
                                     message->payload, message->payloadlen);
 
         std::string buffer;
@@ -57,7 +84,11 @@ public:
     }
 
 protected:
-	request_t request;
+    // Evictor pattern implementation for cache
+    typedef std::map<std::string, request_t> request_cache_t;
+    typedef std::list<request_cache_t::const_iterator> evictor_list_t;
+	request_cache_t cache;
+    evictor_list_t evictor_list;
 };
 
 

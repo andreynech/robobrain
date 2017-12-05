@@ -25,17 +25,21 @@ static std::uniform_real_distribution<btScalar> random_uniform(0.0, 1.0);
 
 
 template <class B, class F>
-void par_for(B begin, B end, F fn) {
+void par_for(B begin, B end, F fn)
+{
   std::atomic<B> idx;
   idx = begin;
-
   size_t num_cpus = std::thread::hardware_concurrency();
   std::vector<std::future<std::result_of_t<std::decay_t<F>(B, size_t)>> > futures(num_cpus);
-  for(size_t cpu = 0; cpu != num_cpus; ++cpu) {
+
+  for(size_t cpu = 0; cpu != num_cpus; ++cpu)
+  {
     futures[cpu] = std::async(
       std::launch::async,
-      [cpu, &idx, end, &fn]() {
-        for (;;) {
+      [cpu, &idx, end, &fn]()
+      {
+        for (;;)
+        {
           B i = idx++;
           if(i >= end) break;
           fn(i, cpu);
@@ -43,7 +47,9 @@ void par_for(B begin, B end, F fn) {
       }
     );
   }
-  for(size_t cpu = 0; cpu != num_cpus; ++cpu) {
+
+  for(size_t cpu = 0; cpu != num_cpus; ++cpu)
+  {
     futures[cpu].get();
   }
 }
@@ -298,7 +304,7 @@ processLocRequest(particle::LocRequest &loc_request,
         }
 
         t = std::time(nullptr);
-        std::cout << "Resampling" << std::put_time(std::localtime(&t), "%T") << std::endl;
+        std::cout << "Resampling " << std::put_time(std::localtime(&t), "%T") << std::endl;
         // Resampling
         particle_vector_t p2(request.particles.size());
         particle_vector_t::size_type index = 
