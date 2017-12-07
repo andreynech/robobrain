@@ -26,6 +26,7 @@ struct request_t
 
 
 static btVector4 location(1000, 0, 1000, 0); 
+static btScalar sensor_y_pos = btScalar(300.0);
 
 
 
@@ -41,22 +42,21 @@ int main(int argc, char *argv[])
     particle::LocRequest loc_request;
     particle::EstimatedLocation response;
 
-    loc_request.set_map_location("room.obj");
+    //loc_request.set_map_location("room.obj");
+    loc_request.set_map_location("SpatialMapping_more_simpler.obj");
     loc_request.set_d_theta(0.0f);
-    loc_request.set_s(500.0f);
     loc_request.set_bearing_noise(30.0f);
     loc_request.set_steering_noise(1.0f * 0.5);
-    loc_request.set_distance_noise(50.0);
 
-	request_t request;
+    request_t request;
 
-	{
+    {
     // Create an instance of the Importer class
     Assimp::Importer importer;
     // And have it read the given file with some example postprocessing
     // Usually - if speed is not the most important aspect for you - you'll 
     // propably to request more postprocessing than we do in this example.
-    const aiScene* scene = importer.ReadFile("room.obj", 
+    const aiScene* scene = importer.ReadFile(loc_request.map_location(), 
 		           //aiProcess_FlipWindingOrder       |
                    //aiProcess_CalcTangentSpace       | 
                    aiProcess_Triangulate            |
@@ -113,12 +113,24 @@ int main(int argc, char *argv[])
 
     box_t bbox; 
     bounding_box(request.mesh, bbox);
-	btVector3 world_size = bbox.second - bbox.first;
+    btVector3 world_size = bbox.second - bbox.first;
 
     std::cout << "Bounding box: " << bbox << std::endl;
-	std::cout << "World size: " << world_size << std::endl;
-	std::cout << "Vertex count: " << request.mesh.vertices.size() << std::endl;
-	std::cout << "Triangle count: " << request.mesh.triangles.size() << std::endl;
+    std::cout << "World size: " << world_size << std::endl;
+    std::cout << "Vertex count: " << request.mesh.vertices.size() << std::endl;
+    std::cout << "Triangle count: " << request.mesh.triangles.size() << std::endl;
+
+    const btVector3 &a = bbox.first;
+    //sensor_y_pos = 300;
+
+    sensor_y_pos = world_size.y() / 10;
+    location.setX(a.x() + world_size.x() / 4);
+    location.setY(a.y() + world_size.y() / 2);
+    location.setZ(a.z() + world_size.z() / 4);
+
+    std::cout << "* Starting location: " << location << std::endl;
+    loc_request.set_s(world_size.x() / 10);
+    loc_request.set_distance_noise(loc_request.s() / 10);
 
     // Split the world evenly with boxes
     btScalar box_x_size = world_size.x() / N_BOX;
@@ -136,9 +148,9 @@ int main(int argc, char *argv[])
             {
                 std::make_pair(
                     btVector3( // box center
-                        box_x_size * ix + box_x_half_size,
-                        box_y_half_size,
-                        box_z_size * iz + box_z_half_size
+                        a.x() + box_x_size * ix + box_x_half_size,
+                        a.y() + box_y_half_size,
+                        a.z() + box_z_size * iz + box_z_half_size
                     ),
                     btVector3( // box half sizes
                         box_x_half_size,
@@ -196,7 +208,7 @@ int main(int argc, char *argv[])
         {
             ++m;
             std::cout << "*************** Step: " << step << "  Measurement: " << m << std::endl;
-            meas.origin = btVector3(0.0, 300.0, 0.0);
+            meas.origin = btVector3(0.0, sensor_y_pos, 0.0);
             origin = location + meas.origin;
             std::cout << "Origin: " << origin 
                       << "  direction: " <<  meas.direction 

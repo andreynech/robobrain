@@ -135,7 +135,8 @@ processLocRequest(particle::LocRequest &loc_request,
             }
 
             bounding_box(request.mesh, request.bbox);
-            request.world_size = request.bbox.second - request.bbox.first;
+            const btVector3 &a = request.bbox.first;
+            request.world_size = request.bbox.second - a;
             std::cout << "Bounding box: " << request.bbox << std::endl;
             std::cout << "World size: " << request.world_size << std::endl;
             std::cout << "Vertex count: " << request.mesh.vertices.size() << std::endl;
@@ -156,9 +157,9 @@ processLocRequest(particle::LocRequest &loc_request,
                     {
                         std::make_pair(
                             btVector3( // box center
-                                box_x_size * ix + box_x_half_size,
-                                box_y_half_size,
-                                box_z_size * iz + box_z_half_size
+                                a.x() + box_x_size * ix + box_x_half_size,
+                                a.y() + box_y_half_size,
+                                a.z() + box_z_size * iz + box_z_half_size
                             ),
                             btVector3( // box half sizes
                                 box_x_half_size,
@@ -205,7 +206,7 @@ processLocRequest(particle::LocRequest &loc_request,
             for(auto &particle: request.particles)
             {
                 particle.setX(random_uniform(generator) * request.world_size.x() + request.bbox.first.x());
-                particle.setY(random_uniform(generator) * 3 + request.bbox.first.y());
+                particle.setY(random_uniform(generator) * request.world_size.y() + request.bbox.first.y());//3 + request.bbox.first.y());
                 particle.setZ(random_uniform(generator) * request.world_size.z() + request.bbox.first.z());
                 particle.setW(random_uniform(generator) * btScalar(M_PI) * 2);
 
