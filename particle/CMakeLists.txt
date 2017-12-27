@@ -93,16 +93,16 @@ set(PROTO_FILE particlefilter.proto)
 add_custom_command(
     OUTPUT ${PB_SRCS}
     COMMAND "${grpc_BINARY_DIR}/third_party/protobuf/$<CONFIG>/protoc"
-    ARGS --cpp_out=${PROJECT_BINARY_DIR}/protos-src --proto_path=${PROJECT_SOURCE_DIR}/protos ${PROJECT_SOURCE_DIR}/protos/${PROTO_FILE}
-    DEPENDS ${PROJECT_SOURCE_DIR}/protos/${PROTO_FILE}
+    ARGS --cpp_out=${PROJECT_BINARY_DIR}/protos-src --proto_path=${PROJECT_SOURCE_DIR}/../protos ${PROJECT_SOURCE_DIR}/../protos/${PROTO_FILE}
+    DEPENDS ${PROJECT_SOURCE_DIR}/../protos/${PROTO_FILE}
     COMMENT "Running C++ protocol buffer compiler on ${PROTO_FILE}"
     VERBATIM)
 
 add_custom_command(
     OUTPUT ${GRPC_SRCS}
     COMMAND "${grpc_BINARY_DIR}/third_party/protobuf/$<CONFIG>/protoc"
-    ARGS --grpc_out=${PROJECT_BINARY_DIR}/protos-src --proto_path=${PROJECT_SOURCE_DIR}/protos --plugin=protoc-gen-grpc=${grpc_BINARY_DIR}/Debug/grpc_cpp_plugin${CMAKE_EXECUTABLE_SUFFIX} ${PROJECT_SOURCE_DIR}/protos/${PROTO_FILE}
-    DEPENDS ${PROJECT_SOURCE_DIR}/protos/${PROTO_FILE}
+    ARGS --grpc_out=${PROJECT_BINARY_DIR}/protos-src --proto_path=${PROJECT_SOURCE_DIR}/../protos --plugin=protoc-gen-grpc=${grpc_BINARY_DIR}/Debug/grpc_cpp_plugin${CMAKE_EXECUTABLE_SUFFIX} ${PROJECT_SOURCE_DIR}/../protos/${PROTO_FILE}
+    DEPENDS ${PROJECT_SOURCE_DIR}/../protos/${PROTO_FILE}
     COMMENT "Running C++ gRPC compiler on ${PROTO_FILE}"
     VERBATIM)
 
